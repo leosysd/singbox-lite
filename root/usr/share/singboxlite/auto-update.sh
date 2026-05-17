@@ -72,6 +72,11 @@ restart_mosdns() {
 	/etc/init.d/mosdns restart
 }
 
+enable_mosdns() {
+	uci -q set mosdns.config.enabled='1'
+	uci -q commit mosdns
+}
+
 restart_singbox() {
 	/etc/init.d/sing-box restart
 	sleep 2
@@ -158,6 +163,7 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 	else
 		uninstall_dns_hijack_script
 	fi
+	enable_mosdns
 else
 	uninstall_dns_hijack_script
 	cleanup_dnsmasq_mosdns_upstream

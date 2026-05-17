@@ -16,6 +16,7 @@ var callRestartMosdns = rpc.declare({ object: 'luci.singboxlite', method: 'resta
 var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_remote', params: [ 'url' ], expect: { '': {} } });
 var callCheckImported = rpc.declare({ object: 'luci.singboxlite', method: 'check_imported', params: [ 'source' ], expect: { '': {} } });
 var callApplyImported = rpc.declare({ object: 'luci.singboxlite', method: 'apply_imported', params: [ 'source' ], expect: { '': {} } });
+var callApplyCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'apply_current', expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
 
 function modeText(mode) {
@@ -133,6 +134,26 @@ function saveSettings(message, applyCron, applyNow) {
 		return refreshChanges();
 	}).then(function() {
 		ui.addNotification(null, E('p', {}, message || '已保存设置'), 'info');
+	});
+}
+
+function saveAndApplyAll() {
+	return saveSettings('已保存设置，开始应用', true, true).then(function() {
+		var url = val('sbl-remote-url');
+
+		if (url)
+			return callFetchRemote(url).then(function(res) {
+				return stopIfFailed('远程配置检查', res);
+			}).then(function() {
+				return callApplyImported('remote');
+			});
+
+		return callApplyCurrent();
+	}).then(function(res) {
+		notify('保存并应用', res);
+	}).catch(function(e) {
+		if (e)
+			L.error(e);
 	});
 }
 
@@ -378,7 +399,7 @@ return view.extend({
 				])
 			]),
 			E('div', { 'class': 'sbl-footer' }, [
-				E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveSettings('已保存并应用设置', true, true); } }, '✓ 保存并应用'),
+				E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '✓ 保存并应用'),
 				E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '保存'),
 				E('button', { 'class': 'sbl-btn danger', 'click': function() { location.reload(); } }, '重置')
 			])

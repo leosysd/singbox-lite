@@ -240,6 +240,14 @@ function restart_mosdns_internal() {
 	return { ok: res.code === 0, output: res.stdout };
 }
 
+function enable_mosdns_internal() {
+	if (stat('/etc/init.d/mosdns')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
+
+	let res = exec_cmd("uci -q set mosdns.config.enabled='1'; uci -q commit mosdns");
+	return { ok: res.code === 0, output: res.stdout || '已启用 MosDNS' };
+}
+
 function stop_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: true, skipped: true, output: '未找到 /etc/init.d/mosdns' };
@@ -325,8 +333,7 @@ function check_for_mode(path) {
 	return checked;
 }
 
-function apply_imported(source) {
-	let path = imported_path(source);
+function apply_config(path, source) {
 	let mode = current_mode();
 	let prepared = null;
 	let apply_path = path;
@@ -365,6 +372,10 @@ function apply_imported(source) {
 	if (!mosdns.ok)
 		return { ok: false, step: 'mosdns', output: mosdns.output };
 
+	let mosdns_enable = mode == 'singbox_mosdns' ? enable_mosdns_internal() : { ok: true, skipped: true };
+	if (!mosdns_enable.ok)
+		return { ok: false, step: 'mosdns_enable', output: mosdns_enable.output };
+
 	let backup = backup_current();
 	if (!backup.ok)
 		return { ok: false, step: 'backup', output: backup.output };
@@ -397,9 +408,18 @@ function apply_imported(source) {
 		script: script,
 		dnsmasq: dnsmasq,
 		mosdns: mosdns,
+		mosdns_enable: mosdns_enable,
 		mosdns_after: mosdns_after,
 		dns_hijack_cleanup: cleanup
 	};
+}
+
+function apply_imported(source) {
+	return apply_config(imported_path(source), source);
+}
+
+function apply_current() {
+	return apply_config(config_path(), 'current');
 }
 
 function fetch_remote(url) {
@@ -664,6 +684,12 @@ const methods = {
 		args: { source: 'local' },
 		call: function(request) {
 			return apply_imported(request.args?.source || 'local');
+		}
+	},
+
+	apply_current: {
+		call: function() {
+			return apply_current();
 		}
 	},
 
