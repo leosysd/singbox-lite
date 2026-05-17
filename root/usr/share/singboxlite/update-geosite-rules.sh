@@ -33,6 +33,22 @@ die() {
 	exit 1
 }
 
+validate_dirs() {
+	case "$SINGBOX_DIR" in
+		/etc/sing-box/*) ;;
+		*) die "sing-box ruleset dir must be under /etc/sing-box/" ;;
+	esac
+
+	case "$MOSDNS_DIR" in
+		/etc/mosdns/*) ;;
+		*) die "MosDNS ruleset dir must be under /etc/mosdns/" ;;
+	esac
+
+	case "$SINGBOX_DIR:$MOSDNS_DIR" in
+		*..*) die "ruleset dir must not contain .." ;;
+	esac
+}
+
 usage() {
 	cat <<EOF
 Commands:
@@ -48,6 +64,7 @@ EOF
 }
 
 ensure_dirs() {
+	validate_dirs
 	mkdir -p "$SINGBOX_DIR" "$MOSDNS_DIR" "$WORK_DIR" "$TMP_DIR"
 }
 
@@ -143,6 +160,7 @@ status_file() {
 }
 
 status_rules() {
+	validate_dirs
 	status_file direct_srs "$SINGBOX_DIR/direct-geosite.srs"
 	status_file proxy_srs "$SINGBOX_DIR/proxy-geosite.srs"
 	status_file direct_json "$SINGBOX_DIR/direct-geosite.json"

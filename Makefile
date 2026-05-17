@@ -42,6 +42,7 @@ uci -q get singboxlite.ruleset.update_weekday >/dev/null || uci -q set singboxli
 uci -q get singboxlite.ruleset.restart_singbox >/dev/null || uci -q set singboxlite.ruleset.restart_singbox='0'
 uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='0'
 uci -q commit singboxlite
+rm -f /www/luci-static/resources/view/singboxlite/import.js /www/luci-static/resources/view/singboxlite/mode.js
 /etc/init.d/rpcd restart >/dev/null 2>&1 || true
 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 exit 0
@@ -69,8 +70,6 @@ define Package/luci-app-singbox-lite/install
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/singboxlite
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/overview.js $(1)/www/luci-static/resources/view/singboxlite/overview.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/ruleset.js $(1)/www/luci-static/resources/view/singboxlite/ruleset.js
-	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/import.js $(1)/www/luci-static/resources/view/singboxlite/import.js
-	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/mode.js $(1)/www/luci-static/resources/view/singboxlite/mode.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/logs.js $(1)/www/luci-static/resources/view/singboxlite/logs.js
 endef
 

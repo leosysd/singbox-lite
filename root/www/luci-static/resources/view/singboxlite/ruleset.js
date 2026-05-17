@@ -238,7 +238,7 @@ return view.extend({
 				]),
 				E('div', { 'class': 'sblr-actions' }, [
 					E('button', { 'class': 'sblr-btn primary', 'click': function() {
-						return saveRuleset('已保存规则集设置', true).then(function() {
+						return saveRuleset('已保存规则集设置', false).then(function() {
 							setOutput('正在更新规则集...');
 							return callUpdateRuleset().then(function(res) {
 								notify('更新规则集', res);

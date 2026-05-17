@@ -8,6 +8,8 @@ AUTO_APPLY="$(uci -q get singboxlite.remote.auto_apply || echo 0)"
 MODE="$(uci -q get singboxlite.main.mode || echo singbox_mosdns)"
 MOSDNS_ADDR="$(uci -q get singboxlite.dns.mosdns_addr || echo 127.0.0.1)"
 MOSDNS_PORT="$(uci -q get singboxlite.dns.mosdns_port || echo 5335)"
+DISABLE_DNS_HIJACK="$(uci -q get singboxlite.dns.disable_dns_hijack || echo 1)"
+RESTART_MOSDNS_AFTER_APPLY="$(uci -q get singboxlite.dns.restart_mosdns_after_apply || echo 1)"
 TEMP_DIR="$(uci -q get singboxlite.main.temp_dir || echo /tmp/singboxlite)"
 TEMP_FILE="$TEMP_DIR/import-remote.json"
 MOSDNS_FILE="$TEMP_DIR/import-mosdns.json"
@@ -15,6 +17,15 @@ DNS_HIJACK_BIN="/usr/bin/sing-box-disable-dns-hijack"
 DNS_HIJACK_TEMPLATE="/usr/share/singboxlite/sing-box-disable-dns-hijack.sh"
 PREPARE_MOSDNS="/usr/share/singboxlite/prepare-mosdns-config.uc"
 LOG_PREFIX="singboxlite auto-update:"
+
+case "$CONFIG_PATH" in
+	/etc/sing-box/*) ;;
+	*) CONFIG_PATH="/etc/sing-box/config.json" ;;
+esac
+
+case "$CONFIG_PATH" in
+	*..*) CONFIG_PATH="/etc/sing-box/config.json" ;;
+esac
 
 log_result() {
 	uci -q set singboxlite.remote.last_update_time="$(date '+%Y-%m-%d %H:%M:%S')"
@@ -111,27 +122,38 @@ uci -q commit singboxlite
 }
 
 if [ "$MODE" = "singbox_mosdns" ]; then
-	install_dns_hijack_script
-	restart_mosdns
+	if [ "$DISABLE_DNS_HIJACK" = "1" ]; then
+		install_dns_hijack_script
+	else
+		uninstall_dns_hijack_script
+	fi
 else
 	uninstall_dns_hijack_script
 	stop_mosdns
 fi
 
-BACKUP="${CONFIG_PATH}.bak-singboxlite-$(date '+%Y%m%d-%H%M%S')"
-cp -p "$CONFIG_PATH" "$BACKUP"
+mkdir -p "$(dirname "$CONFIG_PATH")"
+BACKUP=""
+if [ -f "$CONFIG_PATH" ]; then
+	BACKUP="${CONFIG_PATH}.bak-singboxlite-$(date '+%Y%m%d-%H%M%S')"
+	cp -p "$CONFIG_PATH" "$BACKUP"
+fi
+
 cp "$APPLY_FILE" "$CONFIG_PATH"
+[ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS_AFTER_APPLY" = "1" ] && restart_mosdns
 /etc/init.d/sing-box restart
 
 if [ "$MODE" = "singbox_mosdns" ]; then
-	"$DNS_HIJACK_BIN" >/dev/null 2>&1 || {
-		log_result "applied, but DNS hijack cleanup failed"
-		exit 1
-	}
+	if [ "$DISABLE_DNS_HIJACK" = "1" ]; then
+		"$DNS_HIJACK_BIN" >/dev/null 2>&1 || {
+			log_result "applied, but DNS hijack cleanup failed"
+			exit 1
+		}
+	fi
 else
 	stop_mosdns
 fi
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"
 uci -q commit singboxlite
-log_result "applied successfully, backup: $BACKUP"
+[ -n "$BACKUP" ] && log_result "applied successfully, backup: $BACKUP" || log_result "applied successfully, no previous config"

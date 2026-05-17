@@ -64,17 +64,24 @@ function cfg(section, option, fallback) {
 	return value;
 }
 
+function safe_path(value, fallback, pattern) {
+	value = trim_text(value || '');
+	if (value == '' || !match(value, pattern) || match(value, /(^|\/)\.\.?(\/|$)/))
+		return fallback;
+	return value;
+}
+
 function set_cfg(section, option, value) {
 	uci.set('singboxlite', section, option, value || '');
 	uci.commit('singboxlite');
 }
 
 function config_path() {
-	return cfg('main', 'config_path', DEFAULT_CONFIG);
+	return safe_path(cfg('main', 'config_path', DEFAULT_CONFIG), DEFAULT_CONFIG, /^\/etc\/sing-box\/[^\n]+$/);
 }
 
 function log_path() {
-	return cfg('main', 'log_path', DEFAULT_LOG);
+	return safe_path(cfg('main', 'log_path', DEFAULT_LOG), DEFAULT_LOG, /^(\/etc\/sing-box\/|\/tmp\/singboxlite\/)[^\n]+$/);
 }
 
 function temp_dir() {
@@ -93,6 +100,14 @@ function mosdns_addr() {
 
 function mosdns_port() {
 	return cfg('dns', 'mosdns_port', '5335');
+}
+
+function disable_dns_hijack() {
+	return cfg('dns', 'disable_dns_hijack', '1') == '1';
+}
+
+function restart_mosdns_after_apply() {
+	return cfg('dns', 'restart_mosdns_after_apply', '1') == '1';
 }
 
 function ensure_temp_dir() {
@@ -174,7 +189,7 @@ function imported_path(source) {
 function backup_current() {
 	let current = config_path();
 	if (stat(current)?.type != 'file')
-		return { ok: false, output: '当前配置不存在：' + current };
+		return { ok: true, skipped: true, output: '当前配置不存在，跳过备份：' + current, backup: '' };
 
 	let backup = current + '.bak-singboxlite-' + stamp_string();
 	let res = exec_cmd('cp -p ' + shellquote(current) + ' ' + shellquote(backup));
@@ -272,11 +287,13 @@ function apply_imported(source) {
 	if (!checked.ok)
 		return { ok: false, step: 'check', output: checked.output };
 
-	let script = mode == 'singbox_mosdns' ? install_dns_hijack_script() : uninstall_dns_hijack_script();
+	let script = mode == 'singbox_mosdns' && disable_dns_hijack()
+		? install_dns_hijack_script()
+		: uninstall_dns_hijack_script();
 	if (!script.ok)
 		return { ok: false, step: 'dns_hijack_script', output: script.output };
 
-	let mosdns = mode == 'singbox_mosdns' ? restart_mosdns_internal() : stop_mosdns_internal();
+	let mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns.ok)
 		return { ok: false, step: 'mosdns', output: mosdns.output };
 
@@ -285,18 +302,24 @@ function apply_imported(source) {
 		return { ok: false, step: 'backup', output: backup.output };
 
 	let dest = config_path();
+	exec_cmd('mkdir -p ' + shellquote(replace(dest, /\/[^\/]+$/, '')));
 	let copied = exec_cmd('cp ' + shellquote(apply_path) + ' ' + shellquote(dest));
 	if (copied.code !== 0)
 		return { ok: false, step: 'copy', output: copied.stdout, backup: backup.backup };
 
+	let mosdns_after = mode == 'singbox_mosdns' && restart_mosdns_after_apply()
+		? restart_mosdns_internal()
+		: { ok: true, skipped: true };
+	if (!mosdns_after.ok)
+		return { ok: false, step: 'mosdns_after_apply', output: mosdns_after.output, backup: backup.backup };
+
 	let restarted = restart_singbox_internal();
 	let cleanup = { ok: true, skipped: true };
-	let mosdns_after = { ok: true, skipped: true };
 
-	if (mode == 'singbox_mosdns')
+	if (mode == 'singbox_mosdns' && disable_dns_hijack())
 		cleanup = run_dns_hijack_script();
 	else
-		mosdns_after = stop_mosdns_internal();
+		mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : mosdns;
 
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
@@ -393,6 +416,22 @@ function tail_source_log(source, lines) {
 	return tail_log(lines, '');
 }
 
+function cron_time(value, label) {
+	value = trim_text(value || '');
+	let parts = split(value, ':');
+
+	if (length(parts) != 2 || !match(parts[0], /^[0-9]{1,2}$/) || !match(parts[1], /^[0-9]{1,2}$/))
+		return { ok: false, output: label + ' 必须是 HH:MM 格式' };
+
+	let hour = int(parts[0]);
+	let min = int(parts[1]);
+
+	if (hour < 0 || hour > 23 || min < 0 || min > 59)
+		return { ok: false, output: label + ' 超出有效范围' };
+
+	return { ok: true, hour: hour, min: min };
+}
+
 function set_cron() {
 	let cron = '/etc/crontabs/root';
 	let content = readfile(cron) || '';
@@ -415,25 +454,30 @@ function set_cron() {
 	if (content != '')
 		content += '\n';
 
-	let cleanup_time = split(cfg('log', 'cleanup_time', '03:10'), ':');
-	let cleanup_hour = cleanup_time?.[0] || '3';
-	let cleanup_min = cleanup_time?.[1] || '10';
-	let remote_time = split(cfg('remote', 'auto_update_time', '03:00'), ':');
-	let remote_hour = remote_time?.[0] || '3';
-	let remote_min = remote_time?.[1] || '0';
-	let ruleset_time = split(cfg('ruleset', 'update_time', '07:45'), ':');
-	let ruleset_hour = ruleset_time?.[0] || '7';
-	let ruleset_min = ruleset_time?.[1] || '45';
 	let ruleset_weekday = cfg('ruleset', 'update_weekday', '2');
+	if (!match(ruleset_weekday, /^[0-6]$/))
+		return { ok: false, output: '规则集更新星期必须是 0-6' };
 
-	if (cfg('log', 'cleanup_enabled', '1') == '1')
-		content += cleanup_min + ' ' + cleanup_hour + ' * * * /usr/bin/truncate -s 0 ' + log_path() + ' # clear sing-box log daily\n';
+	if (cfg('log', 'cleanup_enabled', '1') == '1') {
+		let cleanup_time = cron_time(cfg('log', 'cleanup_time', '03:10'), '日志清理时间');
+		if (!cleanup_time.ok)
+			return cleanup_time;
+		content += cleanup_time.min + ' ' + cleanup_time.hour + ' * * * /usr/bin/truncate -s 0 ' + shellquote(log_path()) + ' # clear sing-box log daily\n';
+	}
 
-	if (cfg('remote', 'auto_update', '0') == '1')
-		content += remote_min + ' ' + remote_hour + ' * * * /usr/share/singboxlite/auto-update.sh # singboxlite remote config update\n';
+	if (cfg('remote', 'auto_update', '0') == '1') {
+		let remote_time = cron_time(cfg('remote', 'auto_update_time', '03:00'), '远程更新时间');
+		if (!remote_time.ok)
+			return remote_time;
+		content += remote_time.min + ' ' + remote_time.hour + ' * * * /usr/share/singboxlite/auto-update.sh # singboxlite remote config update\n';
+	}
 
-	if (cfg('ruleset', 'auto_update', '1') == '1')
-		content += ruleset_min + ' ' + ruleset_hour + ' * * ' + ruleset_weekday + ' /usr/share/singboxlite/update-geosite-rules.sh update # singboxlite ruleset update\n';
+	if (cfg('ruleset', 'auto_update', '1') == '1') {
+		let ruleset_time = cron_time(cfg('ruleset', 'update_time', '07:45'), '规则集更新时间');
+		if (!ruleset_time.ok)
+			return ruleset_time;
+		content += ruleset_time.min + ' ' + ruleset_time.hour + ' * * ' + ruleset_weekday + ' /usr/share/singboxlite/update-geosite-rules.sh update # singboxlite ruleset update\n';
+	}
 
 	let changed = content != original;
 
@@ -517,8 +561,8 @@ const methods = {
 				remote_url: cfg('remote', 'url', ''),
 				mosdns_addr: mosdns_addr(),
 				mosdns_port: mosdns_port(),
-				ruleset_singbox_dir: cfg('ruleset', 'singbox_dir', '/etc/sing-box/rule-set'),
-				ruleset_mosdns_dir: cfg('ruleset', 'mosdns_dir', '/etc/mosdns/rule'),
+				ruleset_singbox_dir: safe_path(cfg('ruleset', 'singbox_dir', '/etc/sing-box/rule-set'), '/etc/sing-box/rule-set', /^\/etc\/sing-box\/[^\n]+$/),
+				ruleset_mosdns_dir: safe_path(cfg('ruleset', 'mosdns_dir', '/etc/mosdns/rule'), '/etc/mosdns/rule', /^\/etc\/mosdns\/[^\n]+$/),
 				ruleset_last_update_time: cfg('ruleset', 'last_update_time', ''),
 				ruleset_last_update_result: cfg('ruleset', 'last_update_result', '')
 			};

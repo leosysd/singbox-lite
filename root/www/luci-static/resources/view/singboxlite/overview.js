@@ -72,6 +72,8 @@ function saveSettings(message, applyCron) {
 	uci.set('singboxlite', 'remote', 'auto_apply', yes('sbl-remote-apply'));
 	uci.set('singboxlite', 'dns', 'mosdns_addr', val('sbl-mosdns-addr') || '127.0.0.1');
 	uci.set('singboxlite', 'dns', 'mosdns_port', val('sbl-mosdns-port') || '5335');
+	uci.set('singboxlite', 'dns', 'disable_dns_hijack', yes('sbl-disable-dns-hijack'));
+	uci.set('singboxlite', 'dns', 'restart_mosdns_after_apply', yes('sbl-mosdns-restart'));
 	uci.set('singboxlite', 'log', 'cleanup_enabled', yes('sbl-clean-log'));
 	uci.set('singboxlite', 'log', 'tail_lines', val('sbl-tail-lines') || '200');
 
@@ -180,6 +182,8 @@ return view.extend({
 		var remoteApply = uci.get('singboxlite', 'remote', 'auto_apply') === '1';
 		var mosdnsAddr = uci.get('singboxlite', 'dns', 'mosdns_addr') || '127.0.0.1';
 		var mosdnsPort = uci.get('singboxlite', 'dns', 'mosdns_port') || '5335';
+		var disableDnsHijack = uci.get('singboxlite', 'dns', 'disable_dns_hijack') !== '0';
+		var restartMosdns = uci.get('singboxlite', 'dns', 'restart_mosdns_after_apply') !== '0';
 		var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
 
 		return E('div', { 'class': 'sbl-page' }, [
@@ -252,7 +256,7 @@ return view.extend({
 				]),
 				E('div', {}, [
 					E('div', { 'class': 'sbl-panel sbl-card' }, [
-						E('h3', {}, '运行设置'),
+						E('h3', {}, '运行与远程设置'),
 						E('div', { 'class': 'sbl-settings' }, [
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '基础'),
@@ -262,7 +266,7 @@ return view.extend({
 							]),
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '远程配置'),
-								field('JSON URL', input('sbl-remote-url', remoteUrl, 'https://example.com/sing-box.json')),
+								field('远程配置 URL', input('sbl-remote-url', remoteUrl, 'https://example.com/sing-box.json')),
 								field('自动更新', toggle('sbl-remote-auto', remoteAuto, '每天 ' + remoteTime)),
 								field('检查后应用', toggle('sbl-remote-apply', remoteApply, '启用'))
 							]),
@@ -270,7 +274,8 @@ return view.extend({
 								E('h4', {}, 'MosDNS 联动'),
 								field('MosDNS 地址', input('sbl-mosdns-addr', mosdnsAddr)),
 								field('MosDNS 端口', input('sbl-mosdns-port', mosdnsPort)),
-								field('应用后重启', toggle('sbl-mosdns-restart', true, '启用'))
+								field('禁用 DNS 劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
+								field('应用后重启', toggle('sbl-mosdns-restart', restartMosdns, '启用'))
 							]),
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '维护'),

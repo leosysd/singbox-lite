@@ -197,7 +197,13 @@ function setAutoRefresh(enabled) {
 		refreshTimer = null;
 	}
 	if (enabled)
-		refreshTimer = window.setInterval(refreshLog, 5000);
+		refreshTimer = window.setInterval(function() {
+			if (!document.getElementById('sbll-page')) {
+				setAutoRefresh(false);
+				return;
+			}
+			refreshLog();
+		}, 5000);
 	updateText('sbll-auto-value', enabled ? '开启' : '关闭');
 	updateText('sbll-auto-meta', enabled ? '每 5 秒刷新一次' : '手动刷新');
 }
@@ -306,9 +312,10 @@ return view.extend({
 		var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
 		var page;
 
+		setAutoRefresh(false);
 		lastStatus = status;
 
-		page = E('div', { 'class': 'sbll-page' }, [
+		page = E('div', { 'class': 'sbll-page', id: 'sbll-page' }, [
 			css(),
 			E('div', { 'class': 'sbll-panel sbll-hero' }, [
 				E('div', { 'class': 'sbll-title' }, [
