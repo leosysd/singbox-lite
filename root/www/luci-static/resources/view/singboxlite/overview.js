@@ -37,6 +37,12 @@ function yes(id) {
 	return el && el.checked ? '1' : '0';
 }
 
+function refreshChanges() {
+	if (ui.changes && ui.changes.init)
+		return ui.changes.init();
+	return Promise.resolve();
+}
+
 function field(label, node) {
 	return E('label', { 'class': 'sbl-field' }, [
 		E('span', {}, label),
@@ -89,7 +95,7 @@ function toggle(id, checked, text) {
 	]);
 }
 
-function saveSettings(message, applyCron) {
+function saveSettings(message, applyCron, applyNow) {
 	uci.set('singboxlite', 'main', 'mode', val('sbl-mode') || 'singbox_mosdns');
 	uci.set('singboxlite', 'main', 'config_path', val('sbl-config-path') || '/etc/sing-box/config.json');
 	uci.set('singboxlite', 'main', 'log_path', val('sbl-log-path') || '/etc/sing-box/sing-box.log');
@@ -105,10 +111,15 @@ function saveSettings(message, applyCron) {
 	uci.set('singboxlite', 'log', 'tail_lines', val('sbl-tail-lines') || '200');
 
 	return uci.save().then(function() {
-		return uci.commit('singboxlite');
+		if (applyNow)
+			return uci.apply(10);
 	}).then(function() {
 		if (applyCron)
 			return callSetCron();
+	}).then(function(res) {
+		if (res && res.ok === false)
+			notify('写入定时任务', res);
+		return refreshChanges();
 	}).then(function() {
 		ui.addNotification(null, E('p', {}, message || '已保存设置'), 'info');
 	});
@@ -267,7 +278,7 @@ return view.extend({
 							]),
 							importBox('远程 URL 配置', '读取右侧填写的 URL；保存当前输入后拉取、检查并生成待应用文件。', '待检查', 'warn', [
 								E('button', { 'class': 'sbl-btn primary', 'click': function() {
-									return saveSettings('已保存远程 URL').then(function() {
+									return saveSettings('已保存远程 URL', false, true).then(function() {
 										return callFetchRemote(val('sbl-remote-url')).then(function(res) { notify('远程配置检查', res); });
 									});
 								} }, '↓ 拉取并检查'),
@@ -334,8 +345,8 @@ return view.extend({
 				])
 			]),
 			E('div', { 'class': 'sbl-footer' }, [
-				E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveSettings('已保存并应用设置', true); } }, '✓ 保存并应用'),
-				E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置'); } }, '保存'),
+				E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveSettings('已保存并应用设置', true, true); } }, '✓ 保存并应用'),
+				E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '保存'),
 				E('button', { 'class': 'sbl-btn danger', 'click': function() { location.reload(); } }, '重置')
 			])
 		]);

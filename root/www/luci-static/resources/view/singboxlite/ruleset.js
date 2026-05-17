@@ -35,6 +35,12 @@ function yes(id) {
 	return el && el.checked ? '1' : '0';
 }
 
+function refreshChanges() {
+	if (ui.changes && ui.changes.init)
+		return ui.changes.init();
+	return Promise.resolve();
+}
+
 function input(id, value, placeholder) {
 	return E('input', { id: id, value: value || '', placeholder: placeholder || '', 'class': 'sblr-input' });
 }
@@ -132,7 +138,7 @@ function ruleCard(file, state) {
 	]);
 }
 
-function saveRuleset(message, writeCron) {
+function saveRuleset(message, writeCron, applyNow) {
 	uci.set('singboxlite', 'ruleset', 'repo_raw', val('sblr-repo') || 'https://raw.githubusercontent.com/leosysd/ruleset/main/dist');
 	uci.set('singboxlite', 'ruleset', 'singbox_dir', val('sblr-sb-dir') || '/etc/sing-box/rule-set');
 	uci.set('singboxlite', 'ruleset', 'mosdns_dir', val('sblr-md-dir') || '/etc/mosdns/rule');
@@ -143,10 +149,15 @@ function saveRuleset(message, writeCron) {
 	uci.set('singboxlite', 'ruleset', 'restart_mosdns', yes('sblr-restart-md'));
 
 	return uci.save().then(function() {
-		return uci.commit('singboxlite');
+		if (applyNow)
+			return uci.apply(10);
 	}).then(function() {
 		if (writeCron)
 			return callSetCron();
+	}).then(function(res) {
+		if (res && res.ok === false)
+			notify('写入定时任务', res);
+		return refreshChanges();
 	}).then(function() {
 		ui.addNotification(null, E('p', {}, message || '已保存规则集设置'), 'info');
 	});
@@ -238,7 +249,7 @@ return view.extend({
 				]),
 				E('div', { 'class': 'sblr-actions' }, [
 					E('button', { 'class': 'sblr-btn primary', 'click': function() {
-						return saveRuleset('已保存规则集设置', false).then(function() {
+						return saveRuleset('已保存规则集设置', false, true).then(function() {
 							setOutput('正在更新规则集...');
 							return callUpdateRuleset().then(function(res) {
 								notify('更新规则集', res);
@@ -253,7 +264,7 @@ return view.extend({
 						});
 					} }, '✓ 查看状态'),
 					E('button', { 'class': 'sblr-btn', 'click': function() {
-						return saveRuleset('已保存并写入定时任务', true);
+						return saveRuleset('已保存并写入定时任务', true, true);
 					} }, '◴ 写入定时任务'),
 					E('button', { 'class': 'sblr-btn danger', 'click': function() {
 						return callClearRulesetLog().then(function(res) {
@@ -312,8 +323,8 @@ return view.extend({
 				])
 			]),
 			E('div', { 'class': 'sblr-footer' }, [
-				E('button', { 'class': 'sblr-btn primary', 'click': function() { return saveRuleset('已保存并应用规则集设置', true); } }, '✓ 保存并应用'),
-				E('button', { 'class': 'sblr-btn', 'click': function() { return saveRuleset('已保存规则集设置', false); } }, '保存'),
+				E('button', { 'class': 'sblr-btn primary', 'click': function() { return saveRuleset('已保存并应用规则集设置', true, true); } }, '✓ 保存并应用'),
+				E('button', { 'class': 'sblr-btn', 'click': function() { return saveRuleset('已保存规则集设置，等待应用', false, false); } }, '保存'),
 				E('button', { 'class': 'sblr-btn danger', 'click': function() { location.reload(); } }, '重置')
 			])
 		]);

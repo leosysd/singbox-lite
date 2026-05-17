@@ -20,6 +20,12 @@ function val(id) {
 	return el ? el.value : '';
 }
 
+function refreshChanges() {
+	if (ui.changes && ui.changes.init)
+		return ui.changes.init();
+	return Promise.resolve();
+}
+
 function sourceLabel(source) {
 	if (source === 'system')
 		return '系统日志';
@@ -233,10 +239,15 @@ function saveLogSettings(message, writeCron) {
 	uci.set('singboxlite', 'log', 'tail_lines', val('sbll-lines') || '200');
 
 	return uci.save().then(function() {
-		return uci.commit('singboxlite');
+		if (writeCron)
+			return uci.apply(10);
 	}).then(function() {
 		if (writeCron)
 			return callSetCron();
+	}).then(function(res) {
+		if (res && res.ok === false)
+			ui.addNotification(null, E('p', {}, res.output || '写入定时任务失败'), 'error');
+		return refreshChanges();
 	}).then(function() {
 		if (message)
 			ui.addNotification(null, E('p', {}, message), 'info');
