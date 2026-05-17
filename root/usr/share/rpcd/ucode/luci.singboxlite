@@ -371,6 +371,28 @@ function tail_log(lines, filter) {
 	return { ok: true, log: res.stdout, size: file_size(path) };
 }
 
+function tail_source_log(source, lines) {
+	source = source || 'singbox';
+	lines = int(lines || cfg('log', 'tail_lines', '200')) || 200;
+	if (lines < 1)
+		lines = 200;
+	if (lines > 2000)
+		lines = 2000;
+
+	if (source == 'system') {
+		let res = exec_cmd('logread 2>/dev/null | tail -n ' + lines);
+		return { ok: res.code === 0, source: source, log: res.stdout, size: length(res.stdout || '') };
+	}
+
+	if (source == 'app') {
+		let cmd = 'for f in /tmp/singboxlite-ruleset.log /tmp/singboxlite-update.log /tmp/singboxlite-check.log /tmp/singboxlite-prepare.log; do [ -f "$f" ] && { echo "===== $f ====="; tail -n ' + lines + ' "$f"; }; done';
+		let res = exec_cmd(cmd);
+		return { ok: true, source: source, log: res.stdout, size: length(res.stdout || '') };
+	}
+
+	return tail_log(lines, '');
+}
+
 function set_cron() {
 	let cron = '/etc/crontabs/root';
 	let content = readfile(cron) || '';
@@ -591,6 +613,13 @@ const methods = {
 		args: { lines: 200, filter: '' },
 		call: function(request) {
 			return tail_log(request.args?.lines, request.args?.filter);
+		}
+	},
+
+	tail_source_log: {
+		args: { source: 'singbox', lines: 200 },
+		call: function(request) {
+			return tail_source_log(request.args?.source || 'singbox', request.args?.lines || 200);
 		}
 	},
 

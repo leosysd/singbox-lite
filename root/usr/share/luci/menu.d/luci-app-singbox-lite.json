@@ -17,5 +17,21 @@
 			"type": "view",
 			"path": "singboxlite/overview"
 		}
+	},
+	"admin/services/singboxlite/ruleset": {
+		"title": "规则集",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "singboxlite/ruleset"
+		}
+	},
+	"admin/services/singboxlite/logs": {
+		"title": "日志",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "singboxlite/logs"
+		}
 	}
 }

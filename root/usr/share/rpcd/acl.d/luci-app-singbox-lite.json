@@ -5,6 +5,7 @@
 			"file": {
 				"/etc/init.d/sing-box": [ "exec" ],
 				"/etc/init.d/mosdns": [ "exec" ],
+				"/sbin/logread": [ "exec" ],
 				"/etc/sing-box/config.json": [ "read" ],
 				"/etc/sing-box/sing-box.log": [ "read" ],
 				"/usr/bin/sing-box": [ "exec" ],
@@ -15,6 +16,9 @@
 				"/etc/sing-box/rule-set/*": [ "read" ],
 				"/etc/mosdns/rule/*": [ "read" ],
 				"/tmp/singboxlite-ruleset.log": [ "read" ],
+				"/tmp/singboxlite-update.log": [ "read" ],
+				"/tmp/singboxlite-check.log": [ "read" ],
+				"/tmp/singboxlite-prepare.log": [ "read" ],
 				"/tmp/singboxlite/*": [ "read" ]
 			},
 			"ubus": {
@@ -34,6 +38,9 @@
 				"/etc/mosdns/rule/*": [ "read", "write" ],
 				"/usr/bin/sing-box-disable-dns-hijack": [ "read", "write" ],
 				"/tmp/singboxlite-ruleset.log": [ "read", "write" ],
+				"/tmp/singboxlite-update.log": [ "read", "write" ],
+				"/tmp/singboxlite-check.log": [ "read", "write" ],
+				"/tmp/singboxlite-prepare.log": [ "read", "write" ],
 				"/tmp/singboxlite/*": [ "read", "write" ]
 			},
 			"ubus": {

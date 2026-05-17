@@ -13,13 +13,6 @@ var callStatus = rpc.declare({
 	expect: { '': {} }
 });
 
-var callTailLog = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'tail_log',
-	params: [ 'lines', 'filter' ],
-	expect: { '': {} }
-});
-
 var callCheckCurrent = rpc.declare({
 	object: 'luci.singboxlite',
 	method: 'check_current',
@@ -50,12 +43,6 @@ var callRestartMosdns = rpc.declare({
 	expect: { '': {} }
 });
 
-var callCleanLog = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'clean_log',
-	expect: { '': {} }
-});
-
 var callFetchRemote = rpc.declare({
 	object: 'luci.singboxlite',
 	method: 'fetch_remote',
@@ -74,30 +61,6 @@ var callApplyImported = rpc.declare({
 	object: 'luci.singboxlite',
 	method: 'apply_imported',
 	params: [ 'source' ],
-	expect: { '': {} }
-});
-
-var callSetCron = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'set_cron',
-	expect: { '': {} }
-});
-
-var callUpdateRuleset = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'update_ruleset',
-	expect: { '': {} }
-});
-
-var callRulesetStatus = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'ruleset_status',
-	expect: { '': {} }
-});
-
-var callClearRulesetLog = rpc.declare({
-	object: 'luci.singboxlite',
-	method: 'clear_ruleset_log',
 	expect: { '': {} }
 });
 
@@ -121,10 +84,6 @@ function statCard(label, value, meta, cls) {
 	]);
 }
 
-function logBox(text) {
-	return E('pre', { 'class': 'sbl-log' }, text || '暂无日志');
-}
-
 function renderCss() {
 	return E('style', {}, `
 		.sbl-page{color:#344054}
@@ -146,7 +105,6 @@ function renderCss() {
 		.sbl-page .sbl-import-box{border:1px solid #e4e7ec;border-radius:8px;padding:16px;background:#fcfcfd;min-height:140px;display:flex;flex-direction:column;justify-content:space-between}
 		.sbl-page .sbl-import-box h4{font-size:15px;margin:0 0 8px;color:#344054}
 		.sbl-page .sbl-import-box p{margin:0 0 14px;color:#667085;line-height:1.6}
-		.sbl-page .sbl-log{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;background:#0f172a;color:#dbeafe;border-radius:8px;padding:14px;min-height:260px;max-height:360px;overflow:auto;margin:0}
 		.sbl-page .sbl-status-note{color:#667085;margin-top:8px}
 		.sbl-page .cbi-value-title{min-width:220px}
 		@media(max-width:1100px){.sbl-page .sbl-head{align-items:flex-start;flex-direction:column}.sbl-page .sbl-actions{justify-content:flex-start}.sbl-page .sbl-stats,.sbl-page .sbl-two{grid-template-columns:1fr}}
@@ -157,14 +115,12 @@ return view.extend({
 	load: function() {
 		return Promise.all([
 			uci.load('singboxlite'),
-			L.resolveDefault(callStatus(), {}),
-			L.resolveDefault(callTailLog(8, ''), {})
+			L.resolveDefault(callStatus(), {})
 		]);
 	},
 
 	render: function(data) {
 		var status = data[1] || {};
-		var logs = data[2] || {};
 		var dnsLine = status.mosdns_running
 			? 'MosDNS %s:%s'.format(status.mosdns_addr || '127.0.0.1', status.mosdns_port || '5335')
 			: (status.mosdns_installed ? 'MosDNS 未运行' : 'MosDNS 未安装');
@@ -205,18 +161,9 @@ return view.extend({
 						E('button', { 'class': 'btn cbi-button-action', 'click': function() {
 							return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); });
 						} }, '重启 MosDNS'),
-						E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
-							return ui.showModal('确认清理日志', [
-								E('p', {}, '确定要清空 sing-box 日志吗？'),
-								E('div', { 'class': 'right' }, [
-									E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
-									E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
-										ui.hideModal();
-										return callCleanLog().then(function(res) { notify('清理日志', res); });
-									} }, '清理')
-								])
-							]);
-						} }, '清理日志')
+						E('button', { 'class': 'btn cbi-button-action', 'click': function() {
+							location.href = L.url('admin/services/singboxlite/logs');
+						} }, '查看日志')
 					])
 				]), node.firstChild.nextSibling);
 				node.insertBefore(E('div', { 'class': 'sbl-stats' }, [
@@ -319,114 +266,19 @@ return view.extend({
 		o.datatype = 'port';
 		o.default = '5335';
 
-		s = m.section(form.NamedSection, 'ruleset', 'ruleset', '规则集');
-
-		o = s.option(form.Value, 'repo_raw', 'dist 源地址');
-		o.default = 'https://raw.githubusercontent.com/leosysd/ruleset/main/dist';
-		o.rmempty = false;
-
-		o = s.option(form.Value, 'singbox_dir', 'sing-box 规则目录');
-		o.default = '/etc/sing-box/rule-set';
-		o.rmempty = false;
-
-		o = s.option(form.Value, 'mosdns_dir', 'MosDNS 规则目录');
-		o.default = '/etc/mosdns/rule';
-		o.rmempty = false;
-
-		o = s.option(form.Flag, 'auto_update', '自动更新规则集');
-		o.default = o.enabled;
-		o.rmempty = false;
-
-		o = s.option(form.Value, 'update_time', '更新时间');
-		o.default = '07:45';
-		o.placeholder = '07:45';
-		o.depends('auto_update', '1');
-
-		o = s.option(form.ListValue, 'update_weekday', '更新星期');
-		o.value('1', '周一');
-		o.value('2', '周二');
-		o.value('3', '周三');
-		o.value('4', '周四');
-		o.value('5', '周五');
-		o.value('6', '周六');
-		o.value('0', '周日');
-		o.default = '2';
-		o.depends('auto_update', '1');
-
-		o = s.option(form.Flag, 'restart_singbox', '更新后重启 sing-box');
-		o.default = o.disabled;
-		o.rmempty = false;
-
-		o = s.option(form.Flag, 'restart_mosdns', '更新后重启 MosDNS');
-		o.default = o.disabled;
-		o.rmempty = false;
-
-		o = s.option(form.Button, '_update_ruleset', '规则文件');
-		o.inputstyle = 'apply';
-		o.inputtitle = '立即更新规则集';
-		o.onclick = function() {
-			return m.save().then(function() {
-				return callUpdateRuleset().then(function(res) { notify('更新规则集', res); });
-			});
-		};
-
-		o = s.option(form.Button, '_ruleset_status', '规则状态');
-		o.inputstyle = 'action';
-		o.inputtitle = '查看规则状态';
-		o.onclick = function() {
-			return callRulesetStatus().then(function(res) { notify('规则状态', res); });
-		};
-
-		o = s.option(form.Button, '_clear_ruleset_log', '更新日志');
-		o.inputstyle = 'remove';
-		o.inputtitle = '清理规则日志';
-		o.onclick = function() {
-			return callClearRulesetLog().then(function(res) { notify('清理规则日志', res); });
-		};
-
-		s = m.section(form.NamedSection, 'log', 'log', '日志设置');
-
-		o = s.option(form.Flag, 'cleanup_enabled', '每天自动清理日志');
-		o.default = o.enabled;
-		o.rmempty = false;
-
-		o = s.option(form.Value, 'cleanup_time', '清理时间');
-		o.default = '03:10';
-		o.depends('cleanup_enabled', '1');
-
-		o = s.option(form.Value, 'tail_lines', '日志显示行数');
-		o.datatype = 'uinteger';
-		o.default = '200';
-
-		o = s.option(form.Button, '_write_cron', '定时任务');
-		o.inputstyle = 'action';
-		o.inputtitle = '写入所有定时任务';
-		o.onclick = function() {
-			return m.save().then(function() {
-				return callSetCron().then(function(res) {
-					ui.addNotification(null, E('p', res.changed ? '已写入定时任务' : '定时任务无需变更'), 'info');
-				});
-			});
-		};
-
-		s = m.section(form.TypedSection, null, '运行概况与最近日志');
+		s = m.section(form.TypedSection, null, '运行概况');
 		s.anonymous = true;
 		s.addremove = false;
 		s.render = function() {
 			return E('div', { 'class': 'cbi-section' }, [
-				E('h3', {}, '运行概况与最近日志'),
+				E('h3', {}, '运行概况'),
 				E('div', { 'class': 'sbl-two' }, [
-					E('div', {}, [
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'sing-box 版本'), E('div', { 'class': 'cbi-value-field' }, status.singbox_version || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'PID'), E('div', { 'class': 'cbi-value-field' }, status.singbox_pid || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'MosDNS'), E('div', { 'class': 'cbi-value-field' }, status.mosdns_running ? 'running' : 'not running') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '日志大小'), E('div', { 'class': 'cbi-value-field' }, '%1024.2mB'.format((status.log_size || 0) * 1024)) ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次检查'), E('div', { 'class': 'cbi-value-field' }, status.last_check_result || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次应用'), E('div', { 'class': 'cbi-value-field' }, status.last_apply_time || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '规则更新'), E('div', { 'class': 'cbi-value-field' }, status.ruleset_last_update_result || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '规则时间'), E('div', { 'class': 'cbi-value-field' }, status.ruleset_last_update_time || '-') ])
-					]),
-					E('div', {}, logBox(logs.log))
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'sing-box 版本'), E('div', { 'class': 'cbi-value-field' }, status.singbox_version || '-') ]),
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'PID'), E('div', { 'class': 'cbi-value-field' }, status.singbox_pid || '-') ]),
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'MosDNS'), E('div', { 'class': 'cbi-value-field' }, status.mosdns_running ? 'running' : 'not running') ]),
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '日志大小'), E('div', { 'class': 'cbi-value-field' }, '%1024.2mB'.format((status.log_size || 0) * 1024)) ]),
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次检查'), E('div', { 'class': 'cbi-value-field' }, status.last_check_result || '-') ]),
+					E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次应用'), E('div', { 'class': 'cbi-value-field' }, status.last_apply_time || '-') ])
 				])
 			]);
 		};

@@ -68,6 +68,7 @@ define Package/luci-app-singbox-lite/install
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/singboxlite
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/overview.js $(1)/www/luci-static/resources/view/singboxlite/overview.js
+	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/ruleset.js $(1)/www/luci-static/resources/view/singboxlite/ruleset.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/import.js $(1)/www/luci-static/resources/view/singboxlite/import.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/mode.js $(1)/www/luci-static/resources/view/singboxlite/mode.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/logs.js $(1)/www/luci-static/resources/view/singboxlite/logs.js

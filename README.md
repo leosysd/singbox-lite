@@ -45,8 +45,11 @@ MosDNS 规则目录：/etc/mosdns/rule
 
 ```text
 服务 -> SingBox Lite -> 总览
-所有常用设置都在总览第一页。
+服务 -> SingBox Lite -> 规则集
+服务 -> SingBox Lite -> 日志
 ```
+
+总览负责导入、运行模式、远程配置和 MosDNS 联动。规则集放在第二页。日志中心放在第三页。
 
 ## 安全应用流程
 
@@ -89,7 +92,21 @@ App 内置 `/usr/share/singboxlite/update-geosite-rules.sh`，默认下载：
 /etc/mosdns/rule/proxy-geosite.txt
 ```
 
-这些目录可以在 LuCI 首页的“规则集”区域修改。默认自动更新为每周二 07:45。
+这些目录可以在 LuCI 第二页“规则集”区域修改。默认自动更新为每周二 07:45。
+
+## 日志中心
+
+第三页“日志”参考 GFSingBox 的日志中心结构，支持：
+
+```text
+Sing-box 日志
+系统日志
+软件日志
+级别筛选
+关键词搜索
+自动刷新
+原始日志查看
+```
 
 ## 开发原则
 
