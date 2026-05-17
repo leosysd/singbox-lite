@@ -87,26 +87,32 @@ function statCard(label, value, meta, cls) {
 function renderCss() {
 	return E('style', {}, `
 		.sbl-page{color:#344054}
-		.sbl-page .sbl-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 14px}
-		.sbl-page .sbl-title h2{margin:0 0 6px;font-size:22px;color:#344054}
-		.sbl-page .sbl-title p{margin:0;color:#667085}
-		.sbl-page .sbl-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
-		.sbl-page .sbl-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+		.sbl-page .sbl-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
+		.sbl-page .sbl-title h2{margin:0 0 2px;font-size:18px;line-height:1.2;color:#344054}
+		.sbl-page .sbl-title p{margin:0;color:#667085;font-size:12px;line-height:1.35}
+		.sbl-page .sbl-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+		.sbl-page .sbl-actions .btn,.sbl-page .sbl-import-box .btn{min-height:30px;padding:4px 10px;font-size:12px;line-height:1.2}
+		.sbl-page .sbl-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0}
 		.sbl-page .sbl-stat,.sbl-page .cbi-section{background:#fff;border:1px solid #d8dee6;border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
-		.sbl-page .sbl-stat{padding:14px 16px;min-height:74px}
-		.sbl-page .sbl-stat-label{font-size:12px;color:#667085;margin-bottom:7px}
-		.sbl-page .sbl-stat-value{font-size:15px;font-weight:700;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbl-page .sbl-stat{padding:9px 12px;min-height:54px}
+		.sbl-page .sbl-stat-label{font-size:11px;color:#667085;margin-bottom:3px}
+		.sbl-page .sbl-stat-value{font-size:13px;font-weight:700;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 		.sbl-page .sbl-stat-value.ok{color:#047857}
 		.sbl-page .sbl-stat-value.warn{color:#b45309}
-		.sbl-page .sbl-stat-meta{margin-top:6px;font-size:12px;color:#98a2b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbl-page .cbi-section{padding:16px;margin:0 0 14px}
-		.sbl-page .cbi-section h3{font-size:15px;color:#344054;margin-bottom:14px}
-		.sbl-page .sbl-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-		.sbl-page .sbl-import-box{border:1px solid #e4e7ec;border-radius:8px;padding:16px;background:#fcfcfd;min-height:140px;display:flex;flex-direction:column;justify-content:space-between}
-		.sbl-page .sbl-import-box h4{font-size:15px;margin:0 0 8px;color:#344054}
-		.sbl-page .sbl-import-box p{margin:0 0 14px;color:#667085;line-height:1.6}
-		.sbl-page .sbl-status-note{color:#667085;margin-top:8px}
-		.sbl-page .cbi-value-title{min-width:220px}
+		.sbl-page .sbl-stat-meta{margin-top:3px;font-size:11px;color:#98a2b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbl-page .cbi-section{padding:10px 12px !important;margin:0 0 8px !important}
+		.sbl-page .cbi-section h3{font-size:13px;color:#344054;margin:0 0 8px;line-height:1.25}
+		.sbl-page .sbl-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+		.sbl-page .sbl-import-box{border:1px solid #e4e7ec;border-radius:8px;padding:10px 12px;background:#fcfcfd;min-height:88px;display:flex;flex-direction:column;justify-content:space-between}
+		.sbl-page .sbl-import-box h4{font-size:13px;margin:0 0 5px;color:#344054}
+		.sbl-page .sbl-import-box p{margin:0 0 8px;color:#667085;font-size:12px;line-height:1.35}
+		.sbl-page .sbl-status-note{color:#667085;margin-top:6px}
+		.sbl-page .cbi-value{display:grid !important;grid-template-columns:180px minmax(220px,360px);align-items:center;gap:8px;min-height:32px !important;padding:3px 0 !important;margin:0 auto !important;max-width:620px}
+		.sbl-page .sbl-two .cbi-value{max-width:none;grid-template-columns:140px minmax(0,1fr);padding:2px 0 !important}
+		.sbl-page .cbi-value-title{min-width:0 !important;width:auto !important;padding:0;font-size:12px;line-height:1.25}
+		.sbl-page .cbi-value-field{min-width:0}
+		.sbl-page .cbi-value-field input,.sbl-page .cbi-value-field select{height:30px;min-height:30px;max-width:360px;font-size:12px}
+		.sbl-page .cbi-value-field .cbi-input-checkbox{height:auto;min-height:0}
 		@media(max-width:1100px){.sbl-page .sbl-head{align-items:flex-start;flex-direction:column}.sbl-page .sbl-actions{justify-content:flex-start}.sbl-page .sbl-stats,.sbl-page .sbl-two{grid-template-columns:1fr}}
 	`);
 }
