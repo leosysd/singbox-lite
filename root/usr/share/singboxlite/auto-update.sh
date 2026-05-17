@@ -6,10 +6,14 @@ CONFIG_PATH="$(uci -q get singboxlite.main.config_path || echo /etc/sing-box/con
 URL="$(uci -q get singboxlite.remote.url || true)"
 AUTO_APPLY="$(uci -q get singboxlite.remote.auto_apply || echo 0)"
 MODE="$(uci -q get singboxlite.main.mode || echo singbox_mosdns)"
-RESTART_MOSDNS="$(uci -q get singboxlite.dns.restart_mosdns_after_apply || echo 1)"
-DISABLE_DNS_HIJACK="$(uci -q get singboxlite.dns.disable_dns_hijack || echo 1)"
+MOSDNS_ADDR="$(uci -q get singboxlite.dns.mosdns_addr || echo 127.0.0.1)"
+MOSDNS_PORT="$(uci -q get singboxlite.dns.mosdns_port || echo 5335)"
 TEMP_DIR="$(uci -q get singboxlite.main.temp_dir || echo /tmp/singboxlite)"
 TEMP_FILE="$TEMP_DIR/import-remote.json"
+MOSDNS_FILE="$TEMP_DIR/import-mosdns.json"
+DNS_HIJACK_BIN="/usr/bin/sing-box-disable-dns-hijack"
+DNS_HIJACK_TEMPLATE="/usr/share/singboxlite/sing-box-disable-dns-hijack.sh"
+PREPARE_MOSDNS="/usr/share/singboxlite/prepare-mosdns-config.uc"
 LOG_PREFIX="singboxlite auto-update:"
 
 log_result() {
@@ -17,6 +21,32 @@ log_result() {
 	uci -q set singboxlite.remote.last_update_result="$1"
 	uci -q commit singboxlite
 	logger -t singboxlite "$LOG_PREFIX $1"
+}
+
+install_dns_hijack_script() {
+	[ -f "$DNS_HIJACK_TEMPLATE" ] || {
+		log_result "missing DNS hijack cleanup template"
+		exit 1
+	}
+
+	cp "$DNS_HIJACK_TEMPLATE" "$DNS_HIJACK_BIN"
+	chmod 0755 "$DNS_HIJACK_BIN"
+}
+
+uninstall_dns_hijack_script() {
+	rm -f "$DNS_HIJACK_BIN"
+}
+
+stop_mosdns() {
+	[ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns stop >/dev/null 2>&1 || true
+}
+
+restart_mosdns() {
+	[ -x /etc/init.d/mosdns ] || {
+		log_result "mosdns init script not found"
+		exit 1
+	}
+	/etc/init.d/mosdns restart
 }
 
 [ -n "$URL" ] || {
@@ -51,7 +81,20 @@ fi
 	exit 1
 }
 
-/usr/bin/sing-box check -c "$TEMP_FILE" >/tmp/singboxlite-check.log 2>&1 || {
+APPLY_FILE="$TEMP_FILE"
+if [ "$MODE" = "singbox_mosdns" ]; then
+	[ -x "$PREPARE_MOSDNS" ] || {
+		log_result "missing MosDNS config prepare helper"
+		exit 1
+	}
+	"$PREPARE_MOSDNS" "$TEMP_FILE" "$MOSDNS_FILE" "$MOSDNS_ADDR" "$MOSDNS_PORT" >/tmp/singboxlite-prepare.log 2>&1 || {
+		log_result "prepare MosDNS config failed"
+		exit 1
+	}
+	APPLY_FILE="$MOSDNS_FILE"
+fi
+
+/usr/bin/sing-box check -c "$APPLY_FILE" >/tmp/singboxlite-check.log 2>&1 || {
 	log_result "config check failed"
 	exit 1
 }
@@ -67,17 +110,26 @@ uci -q commit singboxlite
 	exit 0
 }
 
-BACKUP="${CONFIG_PATH}.bak-singboxlite-$(date '+%Y%m%d-%H%M%S')"
-cp -p "$CONFIG_PATH" "$BACKUP"
-cp "$TEMP_FILE" "$CONFIG_PATH"
-/etc/init.d/sing-box restart
-
-if [ "$DISABLE_DNS_HIJACK" = "1" ] && [ -x /usr/bin/sing-box-disable-dns-hijack ]; then
-	/usr/bin/sing-box-disable-dns-hijack >/dev/null 2>&1 || true
+if [ "$MODE" = "singbox_mosdns" ]; then
+	install_dns_hijack_script
+	restart_mosdns
+else
+	uninstall_dns_hijack_script
+	stop_mosdns
 fi
 
-if [ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS" = "1" ] && [ -x /etc/init.d/mosdns ]; then
-	/etc/init.d/mosdns restart
+BACKUP="${CONFIG_PATH}.bak-singboxlite-$(date '+%Y%m%d-%H%M%S')"
+cp -p "$CONFIG_PATH" "$BACKUP"
+cp "$APPLY_FILE" "$CONFIG_PATH"
+/etc/init.d/sing-box restart
+
+if [ "$MODE" = "singbox_mosdns" ]; then
+	"$DNS_HIJACK_BIN" >/dev/null 2>&1 || {
+		log_result "applied, but DNS hijack cleanup failed"
+		exit 1
+	}
+else
+	stop_mosdns
 fi
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"

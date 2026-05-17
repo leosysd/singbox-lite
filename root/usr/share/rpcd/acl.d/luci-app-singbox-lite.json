@@ -9,6 +9,8 @@
 				"/etc/sing-box/sing-box.log": [ "read" ],
 				"/usr/bin/sing-box": [ "exec" ],
 				"/usr/bin/sing-box-disable-dns-hijack": [ "exec" ],
+				"/usr/share/singboxlite/prepare-mosdns-config.uc": [ "exec" ],
+				"/usr/share/singboxlite/sing-box-disable-dns-hijack.sh": [ "read" ],
 				"/tmp/singboxlite/*": [ "read" ]
 			},
 			"ubus": {
@@ -22,8 +24,9 @@
 			"file": {
 				"/etc/crontabs/root": [ "read", "write" ],
 				"/etc/sing-box/config.json": [ "read", "write" ],
-				"/etc/sing-box/config.json.bak-*": [ "write" ],
+				"/etc/sing-box/config.json.bak-*": [ "read", "write" ],
 				"/etc/sing-box/sing-box.log": [ "read", "write" ],
+				"/usr/bin/sing-box-disable-dns-hijack": [ "read", "write" ],
 				"/tmp/singboxlite/*": [ "read", "write" ]
 			},
 			"ubus": {

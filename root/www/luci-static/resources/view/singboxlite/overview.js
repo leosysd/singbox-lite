@@ -32,6 +32,12 @@ var callBackup = rpc.declare({
 	expect: { '': {} }
 });
 
+var callDeleteBackups = rpc.declare({
+	object: 'luci.singboxlite',
+	method: 'delete_backups',
+	expect: { '': {} }
+});
+
 var callRestartSingbox = rpc.declare({
 	object: 'luci.singboxlite',
 	method: 'restart_singbox',
@@ -80,9 +86,7 @@ var callSetCron = rpc.declare({
 function modeText(mode) {
 	if (mode === 'singbox_mosdns')
 		return 'sing-box + mosdns';
-	if (mode === 'singbox_dns')
-		return '仅 sing-box DNS';
-	return '仅导入配置';
+	return 'sing-box';
 }
 
 function notify(title, res) {
@@ -165,6 +169,18 @@ return view.extend({
 						E('button', { 'class': 'btn cbi-button-action', 'click': function() {
 							return callBackup().then(function(res) { notify('备份配置', res); });
 						} }, '备份配置'),
+						E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
+							return ui.showModal('确认删除备份', [
+								E('p', {}, '确定要删除 SingBox Lite 创建的配置备份吗？'),
+								E('div', { 'class': 'right' }, [
+									E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
+									E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
+										ui.hideModal();
+										return callDeleteBackups().then(function(res) { notify('删除备份', res); });
+									} }, '删除')
+								])
+							]);
+						} }, '删除备份'),
 						E('button', { 'class': 'btn cbi-button-apply', 'click': function() {
 							return callRestartSingbox().then(function(res) { notify('重启 sing-box', res); });
 						} }, '重启 sing-box'),
@@ -187,8 +203,8 @@ return view.extend({
 				]), node.firstChild.nextSibling);
 				node.insertBefore(E('div', { 'class': 'sbl-stats' }, [
 					statCard('sing-box', status.singbox_running ? '运行中' : (status.singbox_installed ? '未运行' : '未安装'), status.singbox_version || '', status.singbox_running ? 'ok' : 'warn'),
-					statCard('配置', status.config_path || '/etc/sing-box/config.json', '当前配置文件'),
-					statCard('DNS', dnsLine, 'MosDNS 联动', status.mosdns_running ? 'ok' : 'warn'),
+					statCard('配置', status.config_path || '/etc/sing-box/config.json', '备份 ' + (status.backup_count || 0) + ' 个'),
+					statCard('DNS', dnsLine, status.dns_hijack_script_installed ? '清理脚本已安装' : '清理脚本未安装', status.mosdns_running ? 'ok' : 'warn'),
 					statCard('模式', modeText(status.mode), '当前运行模式')
 				]), node.firstChild.nextSibling.nextSibling);
 				return node;
@@ -245,8 +261,7 @@ return view.extend({
 
 		o = s.option(form.ListValue, 'mode', '运行模式');
 		o.value('singbox_mosdns', 'sing-box + mosdns');
-		o.value('singbox_dns', '仅 sing-box DNS');
-		o.value('import_only', '仅导入配置');
+		o.value('singbox_dns', 'sing-box');
 		o.default = 'singbox_mosdns';
 		o.rmempty = false;
 
@@ -285,14 +300,6 @@ return view.extend({
 		o = s.option(form.Value, 'mosdns_port', 'MosDNS 端口');
 		o.datatype = 'port';
 		o.default = '5335';
-
-		o = s.option(form.Flag, 'disable_dns_hijack', '禁用 sing-box DNS 劫持');
-		o.default = o.enabled;
-		o.rmempty = false;
-
-		o = s.option(form.Flag, 'restart_mosdns_after_apply', '应用配置后重启 MosDNS');
-		o.default = o.enabled;
-		o.rmempty = false;
 
 		s = m.section(form.NamedSection, 'log', 'log', '日志设置');
 

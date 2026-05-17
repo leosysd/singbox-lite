@@ -12,6 +12,10 @@ const DEFAULT_LOG = '/etc/sing-box/sing-box.log';
 const DEFAULT_TEMP_DIR = '/tmp/singboxlite';
 const LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
 const REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
+const MOSDNS_TEMP = '/tmp/singboxlite/import-mosdns.json';
+const DNS_HIJACK_BIN = '/usr/bin/sing-box-disable-dns-hijack';
+const DNS_HIJACK_TEMPLATE = '/usr/share/singboxlite/sing-box-disable-dns-hijack.sh';
+const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
 
 function trim_text(value) {
 	return replace(value || '', /^\s+|\s+$/g, '');
@@ -73,6 +77,20 @@ function log_path() {
 
 function temp_dir() {
 	return cfg('main', 'temp_dir', DEFAULT_TEMP_DIR);
+}
+
+function current_mode() {
+	return cfg('main', 'mode', 'singbox_mosdns') == 'singbox_mosdns'
+		? 'singbox_mosdns'
+		: 'singbox_dns';
+}
+
+function mosdns_addr() {
+	return cfg('dns', 'mosdns_addr', '127.0.0.1');
+}
+
+function mosdns_port() {
+	return cfg('dns', 'mosdns_port', '5335');
 }
 
 function ensure_temp_dir() {
@@ -177,51 +195,121 @@ function restart_mosdns_internal() {
 	return { ok: res.code === 0, output: res.stdout };
 }
 
-function maybe_disable_dns_hijack() {
-	if (cfg('dns', 'disable_dns_hijack', '1') !== '1')
-		return { ok: true, skipped: true, output: '未启用禁用 DNS 劫持' };
+function stop_mosdns_internal() {
+	if (stat('/etc/init.d/mosdns')?.type != 'file')
+		return { ok: true, skipped: true, output: '未找到 /etc/init.d/mosdns' };
 
-	if (stat('/usr/bin/sing-box-disable-dns-hijack')?.type != 'file')
-		return { ok: true, skipped: true, output: '未找到 sing-box-disable-dns-hijack' };
-
-	let res = exec_cmd('/usr/bin/sing-box-disable-dns-hijack');
+	let res = exec_cmd('/etc/init.d/mosdns stop');
 	return { ok: res.code === 0, output: res.stdout };
+}
+
+function install_dns_hijack_script() {
+	if (stat(DNS_HIJACK_TEMPLATE)?.type != 'file')
+		return { ok: false, output: '缺少模板脚本：' + DNS_HIJACK_TEMPLATE };
+
+	let res = exec_cmd('cp ' + shellquote(DNS_HIJACK_TEMPLATE) + ' ' + shellquote(DNS_HIJACK_BIN) + ' && chmod 0755 ' + shellquote(DNS_HIJACK_BIN));
+	return { ok: res.code === 0, output: res.stdout || '已安装 DNS DNAT 清理脚本' };
+}
+
+function uninstall_dns_hijack_script() {
+	let res = exec_cmd('rm -f ' + shellquote(DNS_HIJACK_BIN));
+	return { ok: res.code === 0, output: res.stdout || '已卸载 DNS DNAT 清理脚本' };
+}
+
+function run_dns_hijack_script() {
+	if (stat(DNS_HIJACK_BIN)?.type != 'file')
+		return { ok: false, output: '未找到 ' + DNS_HIJACK_BIN };
+
+	let res = exec_cmd(shellquote(DNS_HIJACK_BIN));
+	return { ok: res.code === 0, output: res.stdout || '已清理 sing-box auto_redirect DNS DNAT' };
+}
+
+function prepare_mosdns_config(source) {
+	ensure_temp_dir();
+
+	if (stat(MOSDNS_PREPARE)?.type != 'file')
+		return { ok: false, output: '缺少 MosDNS 配置处理脚本：' + MOSDNS_PREPARE };
+
+	let res = exec_cmd(shellquote(MOSDNS_PREPARE) + ' ' + shellquote(source) + ' ' + shellquote(MOSDNS_TEMP) + ' ' + shellquote(mosdns_addr()) + ' ' + shellquote(mosdns_port()));
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	return { ok: true, path: MOSDNS_TEMP, output: '已生成 MosDNS 模式配置：' + MOSDNS_TEMP };
+}
+
+function check_for_mode(path) {
+	if (current_mode() != 'singbox_mosdns')
+		return check_file(path);
+
+	let prepared = prepare_mosdns_config(path);
+	if (!prepared.ok)
+		return prepared;
+
+	let checked = check_file(prepared.path);
+	checked.prepared_path = prepared.path;
+	return checked;
 }
 
 function apply_imported(source) {
 	let path = imported_path(source);
-	let checked = check_file(path);
+	let mode = current_mode();
+	let prepared = null;
+	let apply_path = path;
+	let checked = null;
+
+	if (mode == 'singbox_mosdns') {
+		prepared = prepare_mosdns_config(path);
+		if (!prepared.ok)
+			return { ok: false, step: 'prepare', output: prepared.output };
+
+		apply_path = prepared.path;
+	}
+
+	checked = check_file(apply_path);
 
 	if (!checked.ok)
 		return { ok: false, step: 'check', output: checked.output };
+
+	let script = mode == 'singbox_mosdns' ? install_dns_hijack_script() : uninstall_dns_hijack_script();
+	if (!script.ok)
+		return { ok: false, step: 'dns_hijack_script', output: script.output };
+
+	let mosdns = mode == 'singbox_mosdns' ? restart_mosdns_internal() : stop_mosdns_internal();
+	if (!mosdns.ok)
+		return { ok: false, step: 'mosdns', output: mosdns.output };
 
 	let backup = backup_current();
 	if (!backup.ok)
 		return { ok: false, step: 'backup', output: backup.output };
 
 	let dest = config_path();
-	let copied = exec_cmd('cp ' + shellquote(path) + ' ' + shellquote(dest));
+	let copied = exec_cmd('cp ' + shellquote(apply_path) + ' ' + shellquote(dest));
 	if (copied.code !== 0)
 		return { ok: false, step: 'copy', output: copied.stdout, backup: backup.backup };
 
 	let restarted = restart_singbox_internal();
-	let dns_hijack = maybe_disable_dns_hijack();
-	let mosdns = { ok: true, skipped: true };
-	let mode = cfg('main', 'mode', 'singbox_mosdns');
+	let cleanup = { ok: true, skipped: true };
+	let mosdns_after = { ok: true, skipped: true };
 
-	if (mode == 'singbox_mosdns' && cfg('dns', 'restart_mosdns_after_apply', '1') == '1')
-		mosdns = restart_mosdns_internal();
+	if (mode == 'singbox_mosdns')
+		cleanup = run_dns_hijack_script();
+	else
+		mosdns_after = stop_mosdns_internal();
 
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
 
 	return {
-		ok: restarted.ok,
+		ok: restarted.ok && cleanup.ok && mosdns_after.ok,
 		step: 'restart',
-		output: restarted.output,
+		output: restarted.output || (mode == 'singbox_mosdns' ? '已应用 MosDNS 模式配置' : '已应用 sing-box 模式配置'),
 		backup: backup.backup,
-		dns_hijack: dns_hijack,
-		mosdns: mosdns
+		mode: mode,
+		prepared_path: prepared?.path || '',
+		script: script,
+		mosdns: mosdns,
+		mosdns_after: mosdns_after,
+		dns_hijack_cleanup: cleanup
 	};
 }
 
@@ -255,7 +343,7 @@ function fetch_remote(url) {
 	set_cfg('main', 'last_import_time', now_string());
 	set_cfg('main', 'last_import_source', 'remote');
 
-	let checked = check_file(path);
+	let checked = check_for_mode(path);
 	set_cfg('main', 'last_check_result', checked.ok ? 'pass' : 'fail');
 	set_cfg('main', 'last_check_time', now_string());
 
@@ -324,6 +412,28 @@ function set_cron() {
 	return { ok: true, changed: changed };
 }
 
+function backup_glob() {
+	return shellquote(config_path() + '.bak-singboxlite-') + '*';
+}
+
+function list_backups() {
+	let res = exec_cmd('ls -1 ' + backup_glob());
+	if (res.code !== 0 || res.stdout == '')
+		return [];
+
+	return split(res.stdout, '\n');
+}
+
+function delete_backups() {
+	let backups = list_backups();
+	let res = exec_cmd('rm -f ' + backup_glob());
+	return {
+		ok: res.code === 0,
+		output: res.code === 0 ? '已删除 ' + length(backups) + ' 个备份' : res.stdout,
+		deleted: length(backups)
+	};
+}
+
 const methods = {
 	status: {
 		call: function() {
@@ -338,13 +448,15 @@ const methods = {
 				config_path: config_path(),
 				log_path: log,
 				log_size: file_size(log),
-				mode: cfg('main', 'mode', 'singbox_mosdns'),
+				mode: current_mode(),
+				dns_hijack_script_installed: command_exists(DNS_HIJACK_BIN),
+				backup_count: length(list_backups()),
 				last_check_result: cfg('main', 'last_check_result', ''),
 				last_check_time: cfg('main', 'last_check_time', ''),
 				last_apply_time: cfg('main', 'last_apply_time', ''),
 				remote_url: cfg('remote', 'url', ''),
-				mosdns_addr: cfg('dns', 'mosdns_addr', '127.0.0.1'),
-				mosdns_port: cfg('dns', 'mosdns_port', '5335')
+				mosdns_addr: mosdns_addr(),
+				mosdns_port: mosdns_port()
 			};
 		}
 	},
@@ -362,7 +474,7 @@ const methods = {
 		args: { source: 'local' },
 		call: function(request) {
 			let source = request.args?.source || 'local';
-			let res = check_file(imported_path(source));
+			let res = check_for_mode(imported_path(source));
 			set_cfg('main', 'last_check_result', res.ok ? 'pass' : 'fail');
 			set_cfg('main', 'last_check_time', now_string());
 			return res;
@@ -386,6 +498,12 @@ const methods = {
 	backup_current: {
 		call: function() {
 			return backup_current();
+		}
+	},
+
+	delete_backups: {
+		call: function() {
+			return delete_backups();
 		}
 	},
 

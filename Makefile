@@ -52,6 +52,8 @@ define Package/luci-app-singbox-lite/install
 
 	$(INSTALL_DIR) $(1)/usr/share/singboxlite
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/auto-update.sh $(1)/usr/share/singboxlite/auto-update.sh
+	$(INSTALL_BIN) ./root/usr/share/singboxlite/prepare-mosdns-config.uc $(1)/usr/share/singboxlite/prepare-mosdns-config.uc
+	$(INSTALL_BIN) ./root/usr/share/singboxlite/sing-box-disable-dns-hijack.sh $(1)/usr/share/singboxlite/sing-box-disable-dns-hijack.sh
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/singboxlite
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/overview.js $(1)/www/luci-static/resources/view/singboxlite/overview.js
