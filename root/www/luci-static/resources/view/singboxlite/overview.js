@@ -17,6 +17,7 @@ var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_r
 var callCheckImported = rpc.declare({ object: 'luci.singboxlite', method: 'check_imported', params: [ 'source' ], expect: { '': {} } });
 var callApplyImported = rpc.declare({ object: 'luci.singboxlite', method: 'apply_imported', params: [ 'source' ], expect: { '': {} } });
 var callApplyCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'apply_current', expect: { '': {} } });
+var callSaveOverviewSettings = rpc.declare({ object: 'luci.singboxlite', method: 'save_overview_settings', params: [ 'settings' ], expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
 
 function modeText(mode) {
@@ -108,23 +109,20 @@ function toggle(id, checked, text) {
 }
 
 function saveSettings(message, applyCron, applyNow) {
-	uci.set('singboxlite', 'main', 'mode', val('sbl-mode') || 'singbox_mosdns');
-	uci.set('singboxlite', 'main', 'config_path', val('sbl-config-path') || '/etc/sing-box/config.json');
-	uci.set('singboxlite', 'main', 'log_path', val('sbl-log-path') || '/etc/sing-box/sing-box.log');
-	uci.set('singboxlite', 'remote', 'url', val('sbl-remote-url'));
-	uci.set('singboxlite', 'remote', 'auto_update', yes('sbl-remote-auto'));
-	uci.set('singboxlite', 'remote', 'auto_update_time', val('sbl-remote-time') || uci.get('singboxlite', 'remote', 'auto_update_time') || '03:00');
-	uci.set('singboxlite', 'remote', 'auto_apply', yes('sbl-remote-apply'));
-	uci.set('singboxlite', 'dns', 'mosdns_addr', val('sbl-mosdns-addr') || '127.0.0.1');
-	uci.set('singboxlite', 'dns', 'mosdns_port', val('sbl-mosdns-port') || '5335');
-	uci.set('singboxlite', 'dns', 'disable_dns_hijack', yes('sbl-disable-dns-hijack'));
-	uci.set('singboxlite', 'dns', 'restart_mosdns_after_apply', yes('sbl-mosdns-restart'));
-	uci.set('singboxlite', 'log', 'cleanup_enabled', yes('sbl-clean-log'));
-	uci.set('singboxlite', 'log', 'tail_lines', val('sbl-tail-lines') || '200');
-
-	return uci.save().then(function() {
-		if (applyNow)
-			return uci.apply(10);
+	return callSaveOverviewSettings({
+		mode: val('sbl-mode') || 'singbox_mosdns',
+		config_path: val('sbl-config-path') || '/etc/sing-box/config.json',
+		log_path: val('sbl-log-path') || '/etc/sing-box/sing-box.log',
+		remote_url: val('sbl-remote-url'),
+		remote_auto: yes('sbl-remote-auto'),
+		remote_time: val('sbl-remote-time') || uci.get('singboxlite', 'remote', 'auto_update_time') || '03:00',
+		remote_apply: yes('sbl-remote-apply'),
+		mosdns_addr: val('sbl-mosdns-addr') || '127.0.0.1',
+		mosdns_port: val('sbl-mosdns-port') || '5335',
+		disable_dns_hijack: yes('sbl-disable-dns-hijack'),
+		restart_mosdns: yes('sbl-mosdns-restart'),
+		clean_log: yes('sbl-clean-log'),
+		tail_lines: val('sbl-tail-lines') || '200'
 	}).then(function() {
 		if (applyCron)
 			return callSetCron();

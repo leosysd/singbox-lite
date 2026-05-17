@@ -78,6 +78,10 @@ function set_cfg(section, option, value) {
 	uci.commit('singboxlite');
 }
 
+function set_cfg_pending(section, option, value) {
+	uci.set('singboxlite', section, option, value || '');
+}
+
 function config_path() {
 	return safe_path(cfg('main', 'config_path', DEFAULT_CONFIG), DEFAULT_CONFIG, /^\/etc\/sing-box\/[^\n]+$/);
 }
@@ -573,6 +577,28 @@ function set_cron() {
 	return { ok: true, changed: changed };
 }
 
+function save_overview_settings(settings) {
+	settings = type(settings) == 'object' ? settings : {};
+
+	set_cfg_pending('main', 'mode', settings.mode == 'singbox_mosdns' ? 'singbox_mosdns' : 'singbox_dns');
+	set_cfg_pending('main', 'config_path', safe_path(settings.config_path, DEFAULT_CONFIG, /^\/etc\/sing-box\/[^\n]+$/));
+	set_cfg_pending('main', 'log_path', safe_path(settings.log_path, DEFAULT_LOG, /^(\/etc\/sing-box\/|\/tmp\/singboxlite\/)[^\n]+$/));
+	set_cfg_pending('remote', 'url', trim_text(settings.remote_url || ''));
+	set_cfg_pending('remote', 'auto_update', settings.remote_auto == '1' ? '1' : '0');
+	set_cfg_pending('remote', 'auto_update_time', trim_text(settings.remote_time || cfg('remote', 'auto_update_time', '03:00')));
+	set_cfg_pending('remote', 'auto_apply', settings.remote_apply == '1' ? '1' : '0');
+	set_cfg_pending('dns', 'mosdns_addr', trim_text(settings.mosdns_addr || '127.0.0.1'));
+	set_cfg_pending('dns', 'mosdns_port', trim_text(settings.mosdns_port || '5335'));
+	set_cfg_pending('dns', 'disable_dns_hijack', settings.disable_dns_hijack == '1' ? '1' : '0');
+	set_cfg_pending('dns', 'restart_mosdns_after_apply', settings.restart_mosdns == '1' ? '1' : '0');
+	set_cfg_pending('log', 'cleanup_enabled', settings.clean_log == '1' ? '1' : '0');
+	set_cfg_pending('log', 'tail_lines', trim_text(settings.tail_lines || '200'));
+
+	uci.commit('singboxlite');
+
+	return { ok: true, output: '已保存 SingBox Lite 设置' };
+}
+
 function backup_glob() {
 	return shellquote(config_path() + '.bak-singboxlite-') + '*';
 }
@@ -690,6 +716,13 @@ const methods = {
 	apply_current: {
 		call: function() {
 			return apply_current();
+		}
+	},
+
+	save_overview_settings: {
+		args: { settings: {} },
+		call: function(request) {
+			return save_overview_settings(request.args?.settings);
 		}
 	},
 
