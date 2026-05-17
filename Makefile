@@ -32,6 +32,16 @@ endef
 define Package/luci-app-singbox-lite/postinst
 #!/bin/sh
 [ -n "$$IPKG_INSTROOT" ] && exit 0
+uci -q get singboxlite.ruleset >/dev/null || uci -q set singboxlite.ruleset='ruleset'
+uci -q get singboxlite.ruleset.repo_raw >/dev/null || uci -q set singboxlite.ruleset.repo_raw='https://raw.githubusercontent.com/leosysd/ruleset/main/dist'
+uci -q get singboxlite.ruleset.singbox_dir >/dev/null || uci -q set singboxlite.ruleset.singbox_dir='/etc/sing-box/rule-set'
+uci -q get singboxlite.ruleset.mosdns_dir >/dev/null || uci -q set singboxlite.ruleset.mosdns_dir='/etc/mosdns/rule'
+uci -q get singboxlite.ruleset.auto_update >/dev/null || uci -q set singboxlite.ruleset.auto_update='1'
+uci -q get singboxlite.ruleset.update_time >/dev/null || uci -q set singboxlite.ruleset.update_time='07:45'
+uci -q get singboxlite.ruleset.update_weekday >/dev/null || uci -q set singboxlite.ruleset.update_weekday='2'
+uci -q get singboxlite.ruleset.restart_singbox >/dev/null || uci -q set singboxlite.ruleset.restart_singbox='0'
+uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='0'
+uci -q commit singboxlite
 /etc/init.d/rpcd restart >/dev/null 2>&1 || true
 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 exit 0
@@ -54,6 +64,7 @@ define Package/luci-app-singbox-lite/install
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/auto-update.sh $(1)/usr/share/singboxlite/auto-update.sh
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/prepare-mosdns-config.uc $(1)/usr/share/singboxlite/prepare-mosdns-config.uc
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/sing-box-disable-dns-hijack.sh $(1)/usr/share/singboxlite/sing-box-disable-dns-hijack.sh
+	$(INSTALL_BIN) ./root/usr/share/singboxlite/update-geosite-rules.sh $(1)/usr/share/singboxlite/update-geosite-rules.sh
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/singboxlite
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/singboxlite/overview.js $(1)/www/luci-static/resources/view/singboxlite/overview.js

@@ -83,6 +83,24 @@ var callSetCron = rpc.declare({
 	expect: { '': {} }
 });
 
+var callUpdateRuleset = rpc.declare({
+	object: 'luci.singboxlite',
+	method: 'update_ruleset',
+	expect: { '': {} }
+});
+
+var callRulesetStatus = rpc.declare({
+	object: 'luci.singboxlite',
+	method: 'ruleset_status',
+	expect: { '': {} }
+});
+
+var callClearRulesetLog = rpc.declare({
+	object: 'luci.singboxlite',
+	method: 'clear_ruleset_log',
+	expect: { '': {} }
+});
+
 function modeText(mode) {
 	if (mode === 'singbox_mosdns')
 		return 'sing-box + mosdns';
@@ -301,6 +319,71 @@ return view.extend({
 		o.datatype = 'port';
 		o.default = '5335';
 
+		s = m.section(form.NamedSection, 'ruleset', 'ruleset', '规则集');
+
+		o = s.option(form.Value, 'repo_raw', 'dist 源地址');
+		o.default = 'https://raw.githubusercontent.com/leosysd/ruleset/main/dist';
+		o.rmempty = false;
+
+		o = s.option(form.Value, 'singbox_dir', 'sing-box 规则目录');
+		o.default = '/etc/sing-box/rule-set';
+		o.rmempty = false;
+
+		o = s.option(form.Value, 'mosdns_dir', 'MosDNS 规则目录');
+		o.default = '/etc/mosdns/rule';
+		o.rmempty = false;
+
+		o = s.option(form.Flag, 'auto_update', '自动更新规则集');
+		o.default = o.enabled;
+		o.rmempty = false;
+
+		o = s.option(form.Value, 'update_time', '更新时间');
+		o.default = '07:45';
+		o.placeholder = '07:45';
+		o.depends('auto_update', '1');
+
+		o = s.option(form.ListValue, 'update_weekday', '更新星期');
+		o.value('1', '周一');
+		o.value('2', '周二');
+		o.value('3', '周三');
+		o.value('4', '周四');
+		o.value('5', '周五');
+		o.value('6', '周六');
+		o.value('0', '周日');
+		o.default = '2';
+		o.depends('auto_update', '1');
+
+		o = s.option(form.Flag, 'restart_singbox', '更新后重启 sing-box');
+		o.default = o.disabled;
+		o.rmempty = false;
+
+		o = s.option(form.Flag, 'restart_mosdns', '更新后重启 MosDNS');
+		o.default = o.disabled;
+		o.rmempty = false;
+
+		o = s.option(form.Button, '_update_ruleset', '规则文件');
+		o.inputstyle = 'apply';
+		o.inputtitle = '立即更新规则集';
+		o.onclick = function() {
+			return m.save().then(function() {
+				return callUpdateRuleset().then(function(res) { notify('更新规则集', res); });
+			});
+		};
+
+		o = s.option(form.Button, '_ruleset_status', '规则状态');
+		o.inputstyle = 'action';
+		o.inputtitle = '查看规则状态';
+		o.onclick = function() {
+			return callRulesetStatus().then(function(res) { notify('规则状态', res); });
+		};
+
+		o = s.option(form.Button, '_clear_ruleset_log', '更新日志');
+		o.inputstyle = 'remove';
+		o.inputtitle = '清理规则日志';
+		o.onclick = function() {
+			return callClearRulesetLog().then(function(res) { notify('清理规则日志', res); });
+		};
+
 		s = m.section(form.NamedSection, 'log', 'log', '日志设置');
 
 		o = s.option(form.Flag, 'cleanup_enabled', '每天自动清理日志');
@@ -317,7 +400,7 @@ return view.extend({
 
 		o = s.option(form.Button, '_write_cron', '定时任务');
 		o.inputstyle = 'action';
-		o.inputtitle = '写入定时任务';
+		o.inputtitle = '写入所有定时任务';
 		o.onclick = function() {
 			return m.save().then(function() {
 				return callSetCron().then(function(res) {
@@ -339,7 +422,9 @@ return view.extend({
 						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, 'MosDNS'), E('div', { 'class': 'cbi-value-field' }, status.mosdns_running ? 'running' : 'not running') ]),
 						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '日志大小'), E('div', { 'class': 'cbi-value-field' }, '%1024.2mB'.format((status.log_size || 0) * 1024)) ]),
 						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次检查'), E('div', { 'class': 'cbi-value-field' }, status.last_check_result || '-') ]),
-						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次应用'), E('div', { 'class': 'cbi-value-field' }, status.last_apply_time || '-') ])
+						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '上次应用'), E('div', { 'class': 'cbi-value-field' }, status.last_apply_time || '-') ]),
+						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '规则更新'), E('div', { 'class': 'cbi-value-field' }, status.ruleset_last_update_result || '-') ]),
+						E('div', { 'class': 'cbi-value' }, [ E('label', { 'class': 'cbi-value-title' }, '规则时间'), E('div', { 'class': 'cbi-value-field' }, status.ruleset_last_update_time || '-') ])
 					]),
 					E('div', {}, logBox(logs.log))
 				])

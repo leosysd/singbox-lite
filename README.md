@@ -23,6 +23,9 @@ SingBox Lite 是一个面向 OpenWrt 的轻量 LuCI App，用来安全导入和�
 - 支持查看、筛选、清理 sing-box 日志。
 - 支持写入每天清理日志的 cron。
 - 支持保存远程配置自动更新时间。
+- 内置 `leosysd/ruleset` 路由器侧规则更新能力。
+- 支持自定义 sing-box 规则目录、MosDNS 规则目录和 dist 源地址。
+- 支持每周定时拉取 6 个规则成品文件。
 
 ## 默认路径
 
@@ -33,6 +36,9 @@ sing-box 配置：/etc/sing-box/config.json
 sing-box 日志：/etc/sing-box/sing-box.log
 MosDNS 服务：/etc/init.d/mosdns
 MosDNS 地址：127.0.0.1:5335
+sing-box 规则目录：/etc/sing-box/rule-set
+MosDNS 规则目录：/etc/mosdns/rule
+规则集源：https://raw.githubusercontent.com/leosysd/ruleset/main/dist
 ```
 
 ## 页面
@@ -69,6 +75,21 @@ sing-box + mosdns 模式：
 ```
 
 检查失败时不会覆盖正式配置。
+
+## 规则集更新
+
+App 内置 `/usr/share/singboxlite/update-geosite-rules.sh`，默认下载：
+
+```text
+/etc/sing-box/rule-set/direct-geosite.srs
+/etc/sing-box/rule-set/proxy-geosite.srs
+/etc/sing-box/rule-set/direct-geosite.json
+/etc/sing-box/rule-set/proxy-geosite.json
+/etc/mosdns/rule/direct-geosite.txt
+/etc/mosdns/rule/proxy-geosite.txt
+```
+
+这些目录可以在 LuCI 首页的“规则集”区域修改。默认自动更新为每周二 07:45。
 
 ## 开发原则
 

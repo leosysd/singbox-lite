@@ -11,6 +11,10 @@
 				"/usr/bin/sing-box-disable-dns-hijack": [ "exec" ],
 				"/usr/share/singboxlite/prepare-mosdns-config.uc": [ "exec" ],
 				"/usr/share/singboxlite/sing-box-disable-dns-hijack.sh": [ "read" ],
+				"/usr/share/singboxlite/update-geosite-rules.sh": [ "exec" ],
+				"/etc/sing-box/rule-set/*": [ "read" ],
+				"/etc/mosdns/rule/*": [ "read" ],
+				"/tmp/singboxlite-ruleset.log": [ "read" ],
 				"/tmp/singboxlite/*": [ "read" ]
 			},
 			"ubus": {
@@ -26,7 +30,10 @@
 				"/etc/sing-box/config.json": [ "read", "write" ],
 				"/etc/sing-box/config.json.bak-*": [ "read", "write" ],
 				"/etc/sing-box/sing-box.log": [ "read", "write" ],
+				"/etc/sing-box/rule-set/*": [ "read", "write" ],
+				"/etc/mosdns/rule/*": [ "read", "write" ],
 				"/usr/bin/sing-box-disable-dns-hijack": [ "read", "write" ],
+				"/tmp/singboxlite-ruleset.log": [ "read", "write" ],
 				"/tmp/singboxlite/*": [ "read", "write" ]
 			},
 			"ubus": {

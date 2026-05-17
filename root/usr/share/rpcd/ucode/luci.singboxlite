@@ -16,6 +16,8 @@ const MOSDNS_TEMP = '/tmp/singboxlite/import-mosdns.json';
 const DNS_HIJACK_BIN = '/usr/bin/sing-box-disable-dns-hijack';
 const DNS_HIJACK_TEMPLATE = '/usr/share/singboxlite/sing-box-disable-dns-hijack.sh';
 const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
+const RULESET_UPDATER = '/usr/share/singboxlite/update-geosite-rules.sh';
+const RULESET_LOG = '/tmp/singboxlite-ruleset.log';
 
 function trim_text(value) {
 	return replace(value || '', /^\s+|\s+$/g, '');
@@ -381,6 +383,8 @@ function set_cron() {
 			continue;
 		if (match(rows[i], /singboxlite remote config update/))
 			continue;
+		if (match(rows[i], /singboxlite ruleset update/))
+			continue;
 		if (rows[i] != '' || i < length(rows) - 1)
 			push(kept, rows[i]);
 	}
@@ -395,12 +399,19 @@ function set_cron() {
 	let remote_time = split(cfg('remote', 'auto_update_time', '03:00'), ':');
 	let remote_hour = remote_time?.[0] || '3';
 	let remote_min = remote_time?.[1] || '0';
+	let ruleset_time = split(cfg('ruleset', 'update_time', '07:45'), ':');
+	let ruleset_hour = ruleset_time?.[0] || '7';
+	let ruleset_min = ruleset_time?.[1] || '45';
+	let ruleset_weekday = cfg('ruleset', 'update_weekday', '2');
 
 	if (cfg('log', 'cleanup_enabled', '1') == '1')
 		content += cleanup_min + ' ' + cleanup_hour + ' * * * /usr/bin/truncate -s 0 ' + log_path() + ' # clear sing-box log daily\n';
 
 	if (cfg('remote', 'auto_update', '0') == '1')
 		content += remote_min + ' ' + remote_hour + ' * * * /usr/share/singboxlite/auto-update.sh # singboxlite remote config update\n';
+
+	if (cfg('ruleset', 'auto_update', '1') == '1')
+		content += ruleset_min + ' ' + ruleset_hour + ' * * ' + ruleset_weekday + ' /usr/share/singboxlite/update-geosite-rules.sh update # singboxlite ruleset update\n';
 
 	let changed = content != original;
 
@@ -434,6 +445,33 @@ function delete_backups() {
 	};
 }
 
+function update_ruleset() {
+	if (stat(RULESET_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少规则集更新脚本：' + RULESET_UPDATER };
+
+	let res = exec_cmd(shellquote(RULESET_UPDATER) + ' update');
+	set_cfg('ruleset', 'last_update_time', now_string());
+	set_cfg('ruleset', 'last_update_result', res.code === 0 ? 'pass' : 'fail');
+
+	return {
+		ok: res.code === 0,
+		output: res.stdout || (res.code === 0 ? '规则集更新完成' : '规则集更新失败')
+	};
+}
+
+function ruleset_status() {
+	if (stat(RULESET_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少规则集更新脚本：' + RULESET_UPDATER };
+
+	let res = exec_cmd(shellquote(RULESET_UPDATER) + ' status');
+	return { ok: res.code === 0, output: res.stdout };
+}
+
+function clear_ruleset_log() {
+	let res = exec_cmd(shellquote(RULESET_UPDATER) + ' clear-log');
+	return { ok: res.code === 0, output: res.stdout || '规则集更新日志已清理' };
+}
+
 const methods = {
 	status: {
 		call: function() {
@@ -456,7 +494,11 @@ const methods = {
 				last_apply_time: cfg('main', 'last_apply_time', ''),
 				remote_url: cfg('remote', 'url', ''),
 				mosdns_addr: mosdns_addr(),
-				mosdns_port: mosdns_port()
+				mosdns_port: mosdns_port(),
+				ruleset_singbox_dir: cfg('ruleset', 'singbox_dir', '/etc/sing-box/rule-set'),
+				ruleset_mosdns_dir: cfg('ruleset', 'mosdns_dir', '/etc/mosdns/rule'),
+				ruleset_last_update_time: cfg('ruleset', 'last_update_time', ''),
+				ruleset_last_update_result: cfg('ruleset', 'last_update_result', '')
 			};
 		}
 	},
@@ -504,6 +546,24 @@ const methods = {
 	delete_backups: {
 		call: function() {
 			return delete_backups();
+		}
+	},
+
+	update_ruleset: {
+		call: function() {
+			return update_ruleset();
+		}
+	},
+
+	ruleset_status: {
+		call: function() {
+			return ruleset_status();
+		}
+	},
+
+	clear_ruleset_log: {
+		call: function() {
+			return clear_ruleset_log();
 		}
 	},
 
