@@ -14,6 +14,7 @@ const LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
 const REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
 const MOSDNS_TEMP = '/tmp/singboxlite/import-mosdns.json';
 const SINGBOX_TEMP = '/tmp/singboxlite/import-singbox.json';
+const SOURCE_CONFIG = '/etc/sing-box/singboxlite-source.json';
 const DNS_HIJACK_BIN = '/usr/bin/sing-box-disable-dns-hijack';
 const DNS_HIJACK_TEMPLATE = '/usr/share/singboxlite/sing-box-disable-dns-hijack.sh';
 const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
@@ -88,6 +89,10 @@ function config_path() {
 
 function log_path() {
 	return safe_path(cfg('main', 'log_path', DEFAULT_LOG), DEFAULT_LOG, /^(\/etc\/sing-box\/|\/tmp\/singboxlite\/)[^\n]+$/);
+}
+
+function source_config_path() {
+	return safe_path(cfg('main', 'source_path', SOURCE_CONFIG), SOURCE_CONFIG, /^\/etc\/sing-box\/[^\n]+$/);
 }
 
 function temp_dir() {
@@ -240,6 +245,10 @@ function restart_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
 
+	uci.set('mosdns', 'config', 'enabled', '1');
+	uci.set('mosdns', 'config', 'redirect', '1');
+	uci.set('mosdns', 'config', 'local_dns_redirect', '0');
+	uci.commit('mosdns');
 	let res = exec_cmd('/etc/init.d/mosdns restart');
 	return { ok: res.code === 0, output: res.stdout };
 }
@@ -248,15 +257,15 @@ function enable_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
 
-	let res = exec_cmd("uci -q set mosdns.config.enabled='1'; uci -q commit mosdns");
-	return { ok: res.code === 0, output: res.stdout || '已启用 MosDNS' };
+	let res = exec_cmd("uci -q set mosdns.config.enabled='1'; uci -q set mosdns.config.redirect='1'; uci -q set mosdns.config.local_dns_redirect='0'; uci -q commit mosdns");
+	return { ok: res.code === 0, output: res.stdout || '已启用 MosDNS 与 DNS 转发' };
 }
 
 function stop_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: true, skipped: true, output: '未找到 /etc/init.d/mosdns' };
 
-	let res = exec_cmd('/etc/init.d/mosdns stop');
+	let res = exec_cmd("uci -q set mosdns.config.redirect='0'; uci -q set mosdns.config.local_dns_redirect='0'; uci -q set mosdns.config.enabled='0'; uci -q commit mosdns; /etc/init.d/mosdns stop");
 	return { ok: res.code === 0, output: res.stdout };
 }
 
@@ -337,6 +346,34 @@ function check_for_mode(path) {
 	return checked;
 }
 
+function store_source_config(path, source) {
+	if (source != 'local' && source != 'remote')
+		return { ok: true, skipped: true };
+
+	let dest = source_config_path();
+	exec_cmd('mkdir -p ' + shellquote(replace(dest, /\/[^\/]+$/, '')));
+
+	let res = exec_cmd('cp -p ' + shellquote(path) + ' ' + shellquote(dest));
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	set_cfg('main', 'source_path', dest);
+	return { ok: true, output: '已保存原始 JSON：' + dest, path: dest };
+}
+
+function current_source_path() {
+	let source = source_config_path();
+
+	if (stat(source)?.type == 'file')
+		return source;
+	if (stat(REMOTE_TEMP)?.type == 'file')
+		return REMOTE_TEMP;
+	if (stat(LOCAL_TEMP)?.type == 'file')
+		return LOCAL_TEMP;
+
+	return config_path();
+}
+
 function apply_config(path, source) {
 	let mode = current_mode();
 	let prepared = null;
@@ -362,19 +399,23 @@ function apply_config(path, source) {
 	if (!checked.ok)
 		return { ok: false, step: 'check', output: checked.output };
 
+	let source_store = store_source_config(path, source);
+	if (!source_store.ok)
+		return { ok: false, step: 'source_store', output: source_store.output };
+
 	let script = mode == 'singbox_mosdns' && disable_dns_hijack()
 		? install_dns_hijack_script()
 		: uninstall_dns_hijack_script();
 	if (!script.ok)
 		return { ok: false, step: 'dns_hijack_script', output: script.output };
 
-	let dnsmasq = mode == 'singbox_dns' ? cleanup_dnsmasq_mosdns_upstream() : { ok: true, skipped: true };
-	if (!dnsmasq.ok)
-		return { ok: false, step: 'dnsmasq', output: dnsmasq.output };
-
 	let mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns.ok)
 		return { ok: false, step: 'mosdns', output: mosdns.output };
+
+	let dnsmasq = mode == 'singbox_dns' ? cleanup_dnsmasq_mosdns_upstream() : { ok: true, skipped: true };
+	if (!dnsmasq.ok)
+		return { ok: false, step: 'dnsmasq', output: dnsmasq.output };
 
 	let mosdns_enable = mode == 'singbox_mosdns' ? enable_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns_enable.ok)
@@ -409,6 +450,7 @@ function apply_config(path, source) {
 		backup: backup.backup,
 		mode: mode,
 		prepared_path: prepared?.path || '',
+		source_store: source_store,
 		script: script,
 		dnsmasq: dnsmasq,
 		mosdns: mosdns,
@@ -423,7 +465,14 @@ function apply_imported(source) {
 }
 
 function apply_current() {
-	return apply_config(config_path(), 'current');
+	let path = current_source_path();
+
+	if (path == REMOTE_TEMP)
+		return apply_config(path, 'remote');
+	if (path == LOCAL_TEMP)
+		return apply_config(path, 'local');
+
+	return apply_config(path, 'current');
 }
 
 function fetch_remote(url) {
@@ -459,6 +508,12 @@ function fetch_remote(url) {
 	let checked = check_for_mode(path);
 	set_cfg('main', 'last_check_result', checked.ok ? 'pass' : 'fail');
 	set_cfg('main', 'last_check_time', now_string());
+
+	if (checked.ok) {
+		let stored = store_source_config(path, 'remote');
+		if (!stored.ok)
+			return { ok: false, temp_path: path, output: stored.output };
+	}
 
 	return { ok: checked.ok, temp_path: path, output: checked.output };
 }

@@ -91,11 +91,11 @@ function modePicker(value) {
 		E('input', { id: 'sbl-mode', type: 'hidden', value: value }),
 		E('button', { type: 'button', 'class': 'sbl-mode-btn ' + (value === 'singbox_mosdns' ? 'active' : ''), 'data-mode': 'singbox_mosdns', 'click': function() { setModeValue('singbox_mosdns'); } }, [
 			E('b', {}, 'sing-box + mosdns'),
-			E('span', {}, '联动 MosDNS')
+			E('span', {}, '开启 MosDNS DNS 转发')
 		]),
 		E('button', { type: 'button', 'class': 'sbl-mode-btn ' + (value === 'singbox_dns' ? 'active' : ''), 'data-mode': 'singbox_dns', 'click': function() { setModeValue('singbox_dns'); } }, [
 			E('b', {}, 'sing-box'),
-			E('span', {}, '原始 JSON')
+			E('span', {}, '关闭 MosDNS DNS 转发')
 		])
 	]);
 }
@@ -137,15 +137,6 @@ function saveSettings(message, applyCron, applyNow) {
 
 function saveAndApplyAll() {
 	return saveSettings('已保存设置，开始应用', true, true).then(function() {
-		var url = val('sbl-remote-url');
-
-		if (url)
-			return callFetchRemote(url).then(function(res) {
-				return stopIfFailed('远程配置检查', res);
-			}).then(function() {
-				return callApplyImported('remote');
-			});
-
 		return callApplyCurrent();
 	}).then(function(res) {
 		notify('保存并应用', res);

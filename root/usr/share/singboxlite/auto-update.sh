@@ -51,6 +51,10 @@ uninstall_dns_hijack_script() {
 }
 
 stop_mosdns() {
+	uci -q set mosdns.config.redirect='0'
+	uci -q set mosdns.config.local_dns_redirect='0'
+	uci -q set mosdns.config.enabled='0'
+	uci -q commit mosdns
 	[ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns stop >/dev/null 2>&1 || true
 }
 
@@ -69,11 +73,17 @@ restart_mosdns() {
 		log_result "mosdns init script not found"
 		exit 1
 	}
+	uci -q set mosdns.config.enabled='1'
+	uci -q set mosdns.config.redirect='1'
+	uci -q set mosdns.config.local_dns_redirect='0'
+	uci -q commit mosdns
 	/etc/init.d/mosdns restart
 }
 
 enable_mosdns() {
 	uci -q set mosdns.config.enabled='1'
+	uci -q set mosdns.config.redirect='1'
+	uci -q set mosdns.config.local_dns_redirect='0'
 	uci -q commit mosdns
 }
 
@@ -166,8 +176,8 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 	enable_mosdns
 else
 	uninstall_dns_hijack_script
-	cleanup_dnsmasq_mosdns_upstream
 	stop_mosdns
+	cleanup_dnsmasq_mosdns_upstream
 fi
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
