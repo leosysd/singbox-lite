@@ -68,7 +68,7 @@ function saveSettings(message, applyCron) {
 	uci.set('singboxlite', 'main', 'log_path', val('sbl-log-path') || '/etc/sing-box/sing-box.log');
 	uci.set('singboxlite', 'remote', 'url', val('sbl-remote-url'));
 	uci.set('singboxlite', 'remote', 'auto_update', yes('sbl-remote-auto'));
-	uci.set('singboxlite', 'remote', 'auto_update_time', val('sbl-remote-time') || '03:00');
+	uci.set('singboxlite', 'remote', 'auto_update_time', val('sbl-remote-time') || uci.get('singboxlite', 'remote', 'auto_update_time') || '03:00');
 	uci.set('singboxlite', 'remote', 'auto_apply', yes('sbl-remote-apply'));
 	uci.set('singboxlite', 'dns', 'mosdns_addr', val('sbl-mosdns-addr') || '127.0.0.1');
 	uci.set('singboxlite', 'dns', 'mosdns_port', val('sbl-mosdns-port') || '5335');
