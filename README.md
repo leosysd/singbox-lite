@@ -11,13 +11,13 @@ SingBox Lite 是一个面向 OpenWrt 的轻量 LuCI App，用来安全导入和�
 ## 功能
 
 - 显示 sing-box / MosDNS 运行状态。
-- 上传本地 JSON 到临时路径并检查。
-- 拉取远程 JSON 到临时路径并检查。
+- 上传本地 JSON 到 `/etc/sing-box/singboxlite/` 并检查。
+- 拉取远程 JSON 到 `/etc/sing-box/singboxlite/` 并检查。
 - 执行 `sing-box check` 后才允许应用配置。
-- 应用前自动备份 `/etc/sing-box/config.json`。
+- 应用前自动备份 `/etc/sing-box/config.json`，只保留一个滚动备份。
 - 支持 `sing-box` 与 `sing-box + mosdns` 两种运行模式。
 - `sing-box` 模式应用原始 JSON，卸载 DNS DNAT 清理脚本，并停止 MosDNS。
-- `sing-box + mosdns` 模式会改写导入 JSON 的 `dns.servers` / `dns.rules`，让 sing-box DNS 指向 `127.0.0.1:5335`，并安装执行 DNS DNAT 清理脚本。
+- `sing-box + mosdns` 模式会改写导入 JSON 的 `dns.servers` / `dns.final`，让 sing-box DNS 指向 `127.0.0.1:5335`，移除导入配置里的 `hijack-dns` 规则，并安装执行 DNS DNAT 清理脚本。
 - 支持重启 sing-box 和 MosDNS。
 - 支持删除 SingBox Lite 自动创建的配置备份。
 - 支持查看、筛选、清理 sing-box 日志。
@@ -39,6 +39,8 @@ MosDNS 地址：127.0.0.1:5335
 sing-box 规则目录：/etc/sing-box/rule-set
 MosDNS 规则目录：/etc/mosdns/rule
 规则集源：https://raw.githubusercontent.com/leosysd/ruleset/main/dist
+SingBox Lite 源配置：/etc/sing-box/singboxlite/source.json
+SingBox Lite 导入目录：/etc/sing-box/singboxlite
 ```
 
 ## 页面
@@ -66,8 +68,9 @@ sing-box 模式：
 
 sing-box + mosdns 模式：
 导入本地 JSON 或下载远程 JSON
-生成 MosDNS 模式临时 JSON
-修改 dns.servers / dns.rules 指向 127.0.0.1:5335
+生成 MosDNS 模式待应用 JSON
+修改 dns.servers / dns.final 指向 127.0.0.1:5335
+移除 route.rules 中的 hijack-dns，避免 DNS 循环
 执行 sing-box check -c 处理后的 JSON
 安装 /usr/bin/sing-box-disable-dns-hijack
 重启 MosDNS
@@ -75,6 +78,7 @@ sing-box + mosdns 模式：
 应用处理后的 JSON
 重启 sing-box
 执行 DNS DNAT 清理脚本
+清理导入/处理中间文件
 ```
 
 检查失败时不会覆盖正式配置。

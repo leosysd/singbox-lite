@@ -10,10 +10,11 @@ MOSDNS_ADDR="$(uci -q get singboxlite.dns.mosdns_addr || echo 127.0.0.1)"
 MOSDNS_PORT="$(uci -q get singboxlite.dns.mosdns_port || echo 5335)"
 DISABLE_DNS_HIJACK="$(uci -q get singboxlite.dns.disable_dns_hijack || echo 1)"
 RESTART_MOSDNS_AFTER_APPLY="$(uci -q get singboxlite.dns.restart_mosdns_after_apply || echo 1)"
-TEMP_DIR="$(uci -q get singboxlite.main.temp_dir || echo /tmp/singboxlite)"
+TEMP_DIR="$(uci -q get singboxlite.main.temp_dir || echo /etc/sing-box/singboxlite)"
 TEMP_FILE="$TEMP_DIR/import-remote.json"
 MOSDNS_FILE="$TEMP_DIR/import-mosdns.json"
 SINGBOX_FILE="$TEMP_DIR/import-singbox.json"
+SOURCE_FILE="$TEMP_DIR/source.json"
 DNS_HIJACK_BIN="/usr/bin/sing-box-disable-dns-hijack"
 DNS_HIJACK_TEMPLATE="/usr/share/singboxlite/sing-box-disable-dns-hijack.sh"
 PREPARE_MOSDNS="/usr/share/singboxlite/prepare-mosdns-config.uc"
@@ -28,6 +29,20 @@ esac
 case "$CONFIG_PATH" in
 	*..*) CONFIG_PATH="/etc/sing-box/config.json" ;;
 esac
+
+case "$TEMP_DIR" in
+	/etc/sing-box/*) ;;
+	*) TEMP_DIR="/etc/sing-box/singboxlite" ;;
+esac
+
+case "$TEMP_DIR" in
+	*..*) TEMP_DIR="/etc/sing-box/singboxlite" ;;
+esac
+
+TEMP_FILE="$TEMP_DIR/import-remote.json"
+MOSDNS_FILE="$TEMP_DIR/import-mosdns.json"
+SINGBOX_FILE="$TEMP_DIR/import-singbox.json"
+SOURCE_FILE="$TEMP_DIR/source.json"
 
 log_result() {
 	uci -q set singboxlite.remote.last_update_time="$(date '+%Y-%m-%d %H:%M:%S')"
@@ -48,6 +63,10 @@ install_dns_hijack_script() {
 
 uninstall_dns_hijack_script() {
 	rm -f "$DNS_HIJACK_BIN"
+}
+
+run_dns_hijack_script() {
+	[ -x "$DNS_HIJACK_BIN" ] && "$DNS_HIJACK_BIN" || true
 }
 
 stop_mosdns() {
@@ -160,6 +179,8 @@ uci -q set singboxlite.main.last_check_result="pass"
 uci -q set singboxlite.main.last_check_time="$(date '+%Y-%m-%d %H:%M:%S')"
 uci -q set singboxlite.main.last_import_source="remote"
 uci -q set singboxlite.main.last_import_time="$(date '+%Y-%m-%d %H:%M:%S')"
+cp -p "$TEMP_FILE" "$SOURCE_FILE"
+uci -q set singboxlite.main.source_path="$SOURCE_FILE"
 uci -q commit singboxlite
 
 [ "$AUTO_APPLY" = "1" ] || {
@@ -183,13 +204,16 @@ fi
 mkdir -p "$(dirname "$CONFIG_PATH")"
 BACKUP=""
 if [ -f "$CONFIG_PATH" ]; then
-	BACKUP="${CONFIG_PATH}.bak-singboxlite-$(date '+%Y%m%d-%H%M%S')"
+	BACKUP="${CONFIG_PATH}.bak-singboxlite"
+	rm -f "${CONFIG_PATH}".bak-singboxlite-* 2>/dev/null || true
 	cp -p "$CONFIG_PATH" "$BACKUP"
 fi
 
 cp "$APPLY_FILE" "$CONFIG_PATH"
 [ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS_AFTER_APPLY" = "1" ] && restart_mosdns
 restart_singbox
+[ "$MODE" = "singbox_mosdns" ] && [ "$DISABLE_DNS_HIJACK" = "1" ] && run_dns_hijack_script
+rm -f "$TEMP_FILE" "$MOSDNS_FILE" "$SINGBOX_FILE"
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"
 uci -q commit singboxlite

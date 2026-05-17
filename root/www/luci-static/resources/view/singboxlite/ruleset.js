@@ -307,7 +307,7 @@ return view.extend({
 						E('div', { 'class': 'sblr-box' }, [
 							E('h4', {}, '执行流程'),
 							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '1'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '下载 6 个成品文件'), E('span', {}, 'srs / json / txt 分别用于 sing-box 和 MosDNS') ]), E('span', { 'class': 'sblr-flow-meta' }, '30s 超时') ]),
-							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '2'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '写入临时目录'), E('span', {}, '全部下载成功后再替换正式文件') ]), E('span', { 'class': 'sblr-flow-meta' }, '/tmp/singboxlite/ruleset') ]),
+							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '2'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '写入临时目录'), E('span', {}, '全部下载成功后再替换正式文件') ]), E('span', { 'class': 'sblr-flow-meta' }, '/etc/sing-box/singboxlite/ruleset') ]),
 							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '3'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '备份并替换'), E('span', {}, '旧规则保留 .bak，避免半更新状态') ]), E('span', { 'class': 'sblr-flow-meta' }, 'atomic replace') ])
 						])
 					])

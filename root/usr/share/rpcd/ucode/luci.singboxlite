@@ -9,12 +9,15 @@ const uci = cursor();
 
 const DEFAULT_CONFIG = '/etc/sing-box/config.json';
 const DEFAULT_LOG = '/etc/sing-box/sing-box.log';
-const DEFAULT_TEMP_DIR = '/tmp/singboxlite';
-const LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
-const REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
-const MOSDNS_TEMP = '/tmp/singboxlite/import-mosdns.json';
-const SINGBOX_TEMP = '/tmp/singboxlite/import-singbox.json';
-const SOURCE_CONFIG = '/etc/sing-box/singboxlite-source.json';
+const DEFAULT_TEMP_DIR = '/etc/sing-box/singboxlite';
+const LOCAL_TEMP = '/etc/sing-box/singboxlite/import-local.json';
+const REMOTE_TEMP = '/etc/sing-box/singboxlite/import-remote.json';
+const MOSDNS_TEMP = '/etc/sing-box/singboxlite/import-mosdns.json';
+const SINGBOX_TEMP = '/etc/sing-box/singboxlite/import-singbox.json';
+const SOURCE_CONFIG = '/etc/sing-box/singboxlite/source.json';
+const OLD_SOURCE_CONFIG = '/etc/sing-box/singboxlite-source.json';
+const OLD_LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
+const OLD_REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
 const DNS_HIJACK_BIN = '/usr/bin/sing-box-disable-dns-hijack';
 const DNS_HIJACK_TEMPLATE = '/usr/share/singboxlite/sing-box-disable-dns-hijack.sh';
 const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
@@ -96,7 +99,7 @@ function source_config_path() {
 }
 
 function temp_dir() {
-	return cfg('main', 'temp_dir', DEFAULT_TEMP_DIR);
+	return safe_path(cfg('main', 'temp_dir', DEFAULT_TEMP_DIR), DEFAULT_TEMP_DIR, /^\/etc\/sing-box\/[^\n]+$/);
 }
 
 function current_mode() {
@@ -202,8 +205,8 @@ function backup_current() {
 	if (stat(current)?.type != 'file')
 		return { ok: true, skipped: true, output: '当前配置不存在，跳过备份：' + current, backup: '' };
 
-	let backup = current + '.bak-singboxlite-' + stamp_string();
-	let res = exec_cmd('cp -p ' + shellquote(current) + ' ' + shellquote(backup));
+	let backup = current + '.bak-singboxlite';
+	let res = exec_cmd('rm -f ' + shellquote(current + '.bak-singboxlite-') + '* 2>/dev/null || true; cp -p ' + shellquote(current) + ' ' + shellquote(backup));
 	return { ok: res.code === 0, output: res.stdout, backup: backup };
 }
 
@@ -239,6 +242,14 @@ function start_singbox_internal() {
 		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'sing-box 启动后未保持运行')) };
 
 	return { ok: true, output: res.stdout || 'sing-box 已启动' };
+}
+
+function stop_singbox_internal() {
+	if (stat('/etc/init.d/sing-box')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
+
+	let res = exec_cmd('/etc/init.d/sing-box stop');
+	return { ok: res.code === 0, output: res.stdout || 'sing-box 已停止' };
 }
 
 function restart_mosdns_internal() {
@@ -298,6 +309,14 @@ function install_dns_hijack_script() {
 function uninstall_dns_hijack_script() {
 	let res = exec_cmd('rm -f ' + shellquote(DNS_HIJACK_BIN));
 	return { ok: res.code === 0, output: res.stdout || '已卸载 DNS DNAT 清理脚本' };
+}
+
+function run_dns_hijack_script() {
+	if (stat(DNS_HIJACK_BIN)?.type != 'file')
+		return { ok: true, skipped: true, output: 'DNS DNAT 清理脚本未安装' };
+
+	let res = exec_cmd(shellquote(DNS_HIJACK_BIN));
+	return { ok: res.code === 0, output: res.stdout || '已清理 sing-box 自动生成的 53 端口 DNS DNAT' };
 }
 
 function prepare_mosdns_config(source) {
@@ -366,12 +385,23 @@ function current_source_path() {
 
 	if (stat(source)?.type == 'file')
 		return source;
+	if (stat(OLD_SOURCE_CONFIG)?.type == 'file')
+		return OLD_SOURCE_CONFIG;
 	if (stat(REMOTE_TEMP)?.type == 'file')
 		return REMOTE_TEMP;
 	if (stat(LOCAL_TEMP)?.type == 'file')
 		return LOCAL_TEMP;
+	if (stat(OLD_REMOTE_TEMP)?.type == 'file')
+		return OLD_REMOTE_TEMP;
+	if (stat(OLD_LOCAL_TEMP)?.type == 'file')
+		return OLD_LOCAL_TEMP;
 
 	return config_path();
+}
+
+function cleanup_stage_files() {
+	let res = exec_cmd('rm -f ' + shellquote(LOCAL_TEMP) + ' ' + shellquote(REMOTE_TEMP) + ' ' + shellquote(MOSDNS_TEMP) + ' ' + shellquote(SINGBOX_TEMP) + ' 2>/dev/null || true; rm -rf /tmp/singboxlite 2>/dev/null || true');
+	return { ok: res.code === 0, output: res.stdout || '已清理临时导入文件' };
 }
 
 function apply_config(path, source) {
@@ -438,13 +468,19 @@ function apply_config(path, source) {
 		return { ok: false, step: 'mosdns_after_apply', output: mosdns_after.output, backup: backup.backup };
 
 	let restarted = restart_singbox_internal();
-	let cleanup = { ok: true, skipped: true };
+	let dns_hijack_cleanup = mode == 'singbox_mosdns' && disable_dns_hijack() && restarted.ok
+		? run_dns_hijack_script()
+		: { ok: true, skipped: true };
+	if (!dns_hijack_cleanup.ok)
+		return { ok: false, step: 'dns_hijack_cleanup', output: dns_hijack_cleanup.output, backup: backup.backup };
+
+	let cleanup = restarted.ok ? cleanup_stage_files() : { ok: true, skipped: true };
 
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
 
 	return {
-		ok: restarted.ok && cleanup.ok && mosdns_after.ok,
+		ok: restarted.ok && cleanup.ok && mosdns_after.ok && dns_hijack_cleanup.ok,
 		step: 'restart',
 		output: restarted.output || (mode == 'singbox_mosdns' ? '已应用 MosDNS 模式配置' : '已应用 sing-box 模式配置'),
 		backup: backup.backup,
@@ -456,7 +492,8 @@ function apply_config(path, source) {
 		mosdns: mosdns,
 		mosdns_enable: mosdns_enable,
 		mosdns_after: mosdns_after,
-		dns_hijack_cleanup: cleanup
+		dns_hijack_cleanup: dns_hijack_cleanup,
+		stage_cleanup: cleanup
 	};
 }
 
@@ -655,7 +692,7 @@ function save_overview_settings(settings) {
 }
 
 function backup_glob() {
-	return shellquote(config_path() + '.bak-singboxlite-') + '*';
+	return shellquote(config_path() + '.bak-singboxlite') + '*';
 }
 
 function list_backups() {
@@ -820,6 +857,12 @@ const methods = {
 	start_singbox: {
 		call: function() {
 			return start_singbox_internal();
+		}
+	},
+
+	stop_singbox: {
+		call: function() {
+			return stop_singbox_internal();
 		}
 	},
 

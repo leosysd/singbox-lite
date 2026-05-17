@@ -31,27 +31,36 @@ try {
 if (type(config) != 'object')
 	fail('JSON 顶层必须是对象');
 
-if (type(config.dns) != 'object')
-	config.dns = {};
-
-config.dns.servers = [
+config.dns = {
+	servers: [
 	{
 		type: 'udp',
 		tag: 'mosdns',
 		server: mosdns_addr,
 		server_port: mosdns_port
 	}
-];
-config.dns.rules = [
-	{
-		action: 'route',
-		server: 'mosdns'
-	}
-];
-config.dns.final = 'mosdns';
-config.dns.reverse_mapping = true;
+	],
+	final: 'mosdns',
+	reverse_mapping: true
+};
 
-if (type(config.route) == 'object')
+if (type(config.route) == 'object') {
+	if (type(config.route.rules) == 'array') {
+		let rules = [];
+
+		for (let i = 0; i < length(config.route.rules); i++) {
+			let rule = config.route.rules[i];
+
+			if (type(rule) == 'object' && rule.action == 'hijack-dns')
+				continue;
+
+			push(rules, rule);
+		}
+
+		config.route.rules = rules;
+	}
+
 	config.route.default_domain_resolver = 'mosdns';
+}
 
 writefile(target, sprintf('%.J\n', config));

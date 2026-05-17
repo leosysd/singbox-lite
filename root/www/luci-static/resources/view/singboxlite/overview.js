@@ -4,13 +4,14 @@
 'require uci';
 'require view';
 
-var LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
+var LOCAL_TEMP = '/etc/sing-box/singboxlite/import-local.json';
 
 var callStatus = rpc.declare({ object: 'luci.singboxlite', method: 'status', expect: { '': {} } });
 var callCheckCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'check_current', expect: { '': {} } });
 var callBackup = rpc.declare({ object: 'luci.singboxlite', method: 'backup_current', expect: { '': {} } });
 var callDeleteBackups = rpc.declare({ object: 'luci.singboxlite', method: 'delete_backups', expect: { '': {} } });
 var callStartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'start_singbox', expect: { '': {} } });
+var callStopSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'stop_singbox', expect: { '': {} } });
 var callRestartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'restart_singbox', expect: { '': {} } });
 var callRestartMosdns = rpc.declare({ object: 'luci.singboxlite', method: 'restart_mosdns', expect: { '': {} } });
 var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_remote', params: [ 'url' ], expect: { '': {} } });
@@ -284,6 +285,7 @@ return view.extend({
 						]);
 					} }, '× 删除备份'),
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callStartSingbox().then(function(res) { notify('启动 sing-box', res); }); } }, '▶ 启动 sing-box'),
+					E('button', { 'class': 'sbl-btn', 'click': function() { return callStopSingbox().then(function(res) { notify('停止 sing-box', res); }); } }, '■ 停止 sing-box'),
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartSingbox().then(function(res) { notify('重启 sing-box', res); }); } }, '↻ 重启 sing-box'),
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '↻ 重启 MosDNS'),
 					E('button', { 'class': 'sbl-btn', 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '= 查看日志')
