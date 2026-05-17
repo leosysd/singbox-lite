@@ -52,12 +52,38 @@ stop_mosdns() {
 	[ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns stop >/dev/null 2>&1 || true
 }
 
+dnsmasq_uses_mosdns() {
+	uci -q show dhcp | grep -F "server='${MOSDNS_ADDR}#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
+	uci -q show dhcp | grep -F "server='127.0.0.1#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
+	uci -q show dhcp | grep -F "server='::1#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
+	uci -q show dhcp | grep -F "server='localhost#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
+	return 1
+}
+
+stop_mosdns_for_singbox_mode() {
+	if dnsmasq_uses_mosdns; then
+		logger -t singboxlite "$LOG_PREFIX dnsmasq still forwards to MosDNS, keep mosdns running to avoid DNS outage"
+		return 0
+	fi
+
+	stop_mosdns
+}
+
 restart_mosdns() {
 	[ -x /etc/init.d/mosdns ] || {
 		log_result "mosdns init script not found"
 		exit 1
 	}
 	/etc/init.d/mosdns restart
+}
+
+restart_singbox() {
+	/etc/init.d/sing-box restart
+	sleep 2
+	/etc/init.d/sing-box status >/dev/null 2>&1 || {
+		log_result "sing-box restart failed"
+		exit 1
+	}
 }
 
 [ -n "$URL" ] || {
@@ -129,7 +155,7 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 	fi
 else
 	uninstall_dns_hijack_script
-	stop_mosdns
+	stop_mosdns_for_singbox_mode
 fi
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
@@ -141,7 +167,7 @@ fi
 
 cp "$APPLY_FILE" "$CONFIG_PATH"
 [ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS_AFTER_APPLY" = "1" ] && restart_mosdns
-/etc/init.d/sing-box restart
+restart_singbox
 
 if [ "$MODE" = "singbox_mosdns" ]; then
 	if [ "$DISABLE_DNS_HIJACK" = "1" ]; then
@@ -151,7 +177,7 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 		}
 	fi
 else
-	stop_mosdns
+	stop_mosdns_for_singbox_mode
 fi
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"

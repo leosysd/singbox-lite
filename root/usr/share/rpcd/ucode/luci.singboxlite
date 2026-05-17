@@ -201,7 +201,16 @@ function restart_singbox_internal() {
 		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
 
 	let res = exec_cmd('/etc/init.d/sing-box restart');
-	return { ok: res.code === 0, output: res.stdout };
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	exec_cmd('sleep 2');
+
+	let status = exec_cmd('/etc/init.d/sing-box status');
+	if (status.code !== 0 || !match(status.stdout, /running/i))
+		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'sing-box 重启后未保持运行')) };
+
+	return { ok: true, output: res.stdout || 'sing-box 已重启' };
 }
 
 function restart_mosdns_internal() {
@@ -218,6 +227,31 @@ function stop_mosdns_internal() {
 
 	let res = exec_cmd('/etc/init.d/mosdns stop');
 	return { ok: res.code === 0, output: res.stdout };
+}
+
+function dnsmasq_uses_mosdns() {
+	let port = mosdns_port();
+	let refs = [
+		"server='" + mosdns_addr() + '#' + port + "'",
+		"server='127.0.0.1#" + port + "'",
+		"server='::1#" + port + "'",
+		"server='localhost#" + port + "'"
+	];
+
+	for (let i = 0; i < length(refs); i++) {
+		let res = exec_cmd('uci -q show dhcp | grep -F ' + shellquote(refs[i]) + ' >/dev/null');
+		if (res.code === 0)
+			return true;
+	}
+
+	return false;
+}
+
+function stop_mosdns_for_singbox_mode() {
+	if (dnsmasq_uses_mosdns())
+		return { ok: true, skipped: true, output: '检测到 dnsmasq 仍转发到 MosDNS，已保留 MosDNS 运行以避免断网' };
+
+	return stop_mosdns_internal();
 }
 
 function install_dns_hijack_script() {
@@ -293,7 +327,7 @@ function apply_imported(source) {
 	if (!script.ok)
 		return { ok: false, step: 'dns_hijack_script', output: script.output };
 
-	let mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : { ok: true, skipped: true };
+	let mosdns = mode == 'singbox_dns' ? stop_mosdns_for_singbox_mode() : { ok: true, skipped: true };
 	if (!mosdns.ok)
 		return { ok: false, step: 'mosdns', output: mosdns.output };
 
@@ -319,7 +353,7 @@ function apply_imported(source) {
 	if (mode == 'singbox_mosdns' && disable_dns_hijack())
 		cleanup = run_dns_hijack_script();
 	else
-		mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : mosdns;
+		mosdns = mode == 'singbox_dns' ? stop_mosdns_for_singbox_mode() : mosdns;
 
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
