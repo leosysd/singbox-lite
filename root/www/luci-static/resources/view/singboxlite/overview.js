@@ -37,6 +37,16 @@ function yes(id) {
 	return el && el.checked ? '1' : '0';
 }
 
+function stopIfFailed(title, res) {
+	if (!res || !res.ok) {
+		notify(title, res || { ok: false, output: '操作失败' });
+		return Promise.reject(new Error((res && res.output) || '操作失败'));
+	}
+
+	notify(title, res);
+	return res;
+}
+
 function refreshChanges() {
 	if (ui.changes && ui.changes.init)
 		return ui.changes.init();
@@ -282,7 +292,18 @@ return view.extend({
 										return callFetchRemote(val('sbl-remote-url')).then(function(res) { notify('远程配置检查', res); });
 									});
 								} }, '↓ 拉取并检查'),
-								E('button', { 'class': 'sbl-btn', 'click': function() { return callApplyImported('remote').then(function(res) { notify('应用远程配置', res); }); } }, '✓ 应用远程配置')
+								E('button', { 'class': 'sbl-btn', 'click': function() {
+									return saveSettings('已保存远程设置', false, true).then(function() {
+										return callFetchRemote(val('sbl-remote-url'));
+									}).then(function(res) {
+										return stopIfFailed('远程配置检查', res);
+									}).then(function() {
+										return callApplyImported('remote').then(function(res) { notify('应用远程配置', res); });
+									}).catch(function(e) {
+										if (e)
+											L.error(e);
+									});
+								} }, '✓ 拉取并应用')
 							])
 						])
 					]),
