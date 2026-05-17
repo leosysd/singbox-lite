@@ -29,6 +29,14 @@ define Package/luci-app-singbox-lite/conffiles
 /etc/config/singboxlite
 endef
 
+define Package/luci-app-singbox-lite/postinst
+#!/bin/sh
+[ -n "$$IPKG_INSTROOT" ] && exit 0
+/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+exit 0
+endef
+
 define Package/luci-app-singbox-lite/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./root/etc/config/singboxlite $(1)/etc/config/singboxlite
