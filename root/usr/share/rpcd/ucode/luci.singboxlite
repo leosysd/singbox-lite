@@ -1,0 +1,426 @@
+#!/usr/bin/env ucode
+
+'use strict';
+
+import { readfile, writefile, stat, popen, mkdir } from 'fs';
+import { cursor } from 'uci';
+
+const uci = cursor();
+
+const DEFAULT_CONFIG = '/etc/sing-box/config.json';
+const DEFAULT_LOG = '/etc/sing-box/sing-box.log';
+const DEFAULT_TEMP_DIR = '/tmp/singboxlite';
+const LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
+const REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
+
+function trim_text(value) {
+	return replace(value || '', /^\s+|\s+$/g, '');
+}
+
+function shellquote(value) {
+	return "'" + replace(value || '', /'/g, "'\"'\"'") + "'";
+}
+
+function now_string() {
+	let p = popen('date "+%Y-%m-%d %H:%M:%S" 2>/dev/null', 'r');
+	if (!p)
+		return '';
+
+	let out = trim_text(p.read('all'));
+	p.close();
+	return out;
+}
+
+function stamp_string() {
+	let p = popen('date "+%Y%m%d-%H%M%S" 2>/dev/null', 'r');
+	if (!p)
+		return 'unknown';
+
+	let out = trim_text(p.read('all'));
+	p.close();
+	return out || 'unknown';
+}
+
+function exec_cmd(cmd) {
+	let p = popen(cmd + ' 2>&1', 'r');
+	if (!p)
+		return { code: -1, stdout: 'failed to execute command' };
+
+	let stdout = p.read('all') || '';
+	let code = p.close();
+	return { code: code, stdout: trim_text(stdout) };
+}
+
+function cfg(section, option, fallback) {
+	let value = uci.get('singboxlite', section, option);
+	if (value == null || value === '')
+		return fallback;
+	return value;
+}
+
+function set_cfg(section, option, value) {
+	uci.set('singboxlite', section, option, value || '');
+	uci.commit('singboxlite');
+}
+
+function config_path() {
+	return cfg('main', 'config_path', DEFAULT_CONFIG);
+}
+
+function log_path() {
+	return cfg('main', 'log_path', DEFAULT_LOG);
+}
+
+function temp_dir() {
+	return cfg('main', 'temp_dir', DEFAULT_TEMP_DIR);
+}
+
+function ensure_temp_dir() {
+	let dir = temp_dir();
+	if (stat(dir)?.type != 'directory')
+		mkdir(dir, 0700);
+	return dir;
+}
+
+function file_size(path) {
+	let s = stat(path);
+	return s?.size || 0;
+}
+
+function command_exists(path) {
+	return stat(path)?.type == 'file';
+}
+
+function service_running(name) {
+	let res = exec_cmd('/etc/init.d/' + name + ' status');
+	return res.code === 0 && match(res.stdout, /running/i);
+}
+
+function singbox_version() {
+	if (!command_exists('/usr/bin/sing-box'))
+		return '';
+
+	let res = exec_cmd('/usr/bin/sing-box version | head -n 1');
+	return res.stdout || '';
+}
+
+function singbox_pid() {
+	let res = exec_cmd('pidof sing-box');
+	if (res.code !== 0)
+		return '';
+	return res.stdout || '';
+}
+
+function validate_json_file(path) {
+	if (stat(path)?.type != 'file')
+		return { ok: false, output: '文件不存在：' + path };
+
+	if (file_size(path) <= 0)
+		return { ok: false, output: '文件为空：' + path };
+
+	let content = readfile(path);
+	if (!content)
+		return { ok: false, output: '无法读取文件：' + path };
+
+	let parsed = null;
+	try {
+		parsed = json(content);
+	} catch (e) {
+		return { ok: false, output: 'JSON 格式错误：' + e };
+	}
+
+	if (type(parsed) != 'object')
+		return { ok: false, output: 'JSON 顶层必须是对象' };
+
+	return { ok: true, output: 'JSON 格式正确' };
+}
+
+function check_file(path) {
+	let basic = validate_json_file(path);
+	if (!basic.ok)
+		return basic;
+
+	if (!command_exists('/usr/bin/sing-box'))
+		return { ok: false, output: '未找到 /usr/bin/sing-box' };
+
+	let res = exec_cmd('/usr/bin/sing-box check -c ' + shellquote(path));
+	return { ok: res.code === 0, output: res.stdout };
+}
+
+function imported_path(source) {
+	return source == 'remote' ? REMOTE_TEMP : LOCAL_TEMP;
+}
+
+function backup_current() {
+	let current = config_path();
+	if (stat(current)?.type != 'file')
+		return { ok: false, output: '当前配置不存在：' + current };
+
+	let backup = current + '.bak-singboxlite-' + stamp_string();
+	let res = exec_cmd('cp -p ' + shellquote(current) + ' ' + shellquote(backup));
+	return { ok: res.code === 0, output: res.stdout, backup: backup };
+}
+
+function restart_singbox_internal() {
+	if (stat('/etc/init.d/sing-box')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
+
+	let res = exec_cmd('/etc/init.d/sing-box restart');
+	return { ok: res.code === 0, output: res.stdout };
+}
+
+function restart_mosdns_internal() {
+	if (stat('/etc/init.d/mosdns')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
+
+	let res = exec_cmd('/etc/init.d/mosdns restart');
+	return { ok: res.code === 0, output: res.stdout };
+}
+
+function maybe_disable_dns_hijack() {
+	if (cfg('dns', 'disable_dns_hijack', '1') !== '1')
+		return { ok: true, skipped: true, output: '未启用禁用 DNS 劫持' };
+
+	if (stat('/usr/bin/sing-box-disable-dns-hijack')?.type != 'file')
+		return { ok: true, skipped: true, output: '未找到 sing-box-disable-dns-hijack' };
+
+	let res = exec_cmd('/usr/bin/sing-box-disable-dns-hijack');
+	return { ok: res.code === 0, output: res.stdout };
+}
+
+function apply_imported(source) {
+	let path = imported_path(source);
+	let checked = check_file(path);
+
+	if (!checked.ok)
+		return { ok: false, step: 'check', output: checked.output };
+
+	let backup = backup_current();
+	if (!backup.ok)
+		return { ok: false, step: 'backup', output: backup.output };
+
+	let dest = config_path();
+	let copied = exec_cmd('cp ' + shellquote(path) + ' ' + shellquote(dest));
+	if (copied.code !== 0)
+		return { ok: false, step: 'copy', output: copied.stdout, backup: backup.backup };
+
+	let restarted = restart_singbox_internal();
+	let dns_hijack = maybe_disable_dns_hijack();
+	let mosdns = { ok: true, skipped: true };
+	let mode = cfg('main', 'mode', 'singbox_mosdns');
+
+	if (mode == 'singbox_mosdns' && cfg('dns', 'restart_mosdns_after_apply', '1') == '1')
+		mosdns = restart_mosdns_internal();
+
+	set_cfg('main', 'last_apply_time', now_string());
+	set_cfg('main', 'last_import_source', source || '');
+
+	return {
+		ok: restarted.ok,
+		step: 'restart',
+		output: restarted.output,
+		backup: backup.backup,
+		dns_hijack: dns_hijack,
+		mosdns: mosdns
+	};
+}
+
+function fetch_remote(url) {
+	ensure_temp_dir();
+
+	url = trim_text(url || cfg('remote', 'url', ''));
+	if (url == '')
+		return { ok: false, output: '远程 URL 不能为空' };
+
+	let path = REMOTE_TEMP;
+	let qurl = shellquote(url);
+	let qpath = shellquote(path);
+	let cmd = '';
+
+	if (exec_cmd('command -v uclient-fetch').code === 0)
+		cmd = 'uclient-fetch -T 30 -O ' + qpath + ' ' + qurl;
+	else if (exec_cmd('command -v wget').code === 0)
+		cmd = 'wget -T 30 -O ' + qpath + ' ' + qurl;
+	else if (exec_cmd('command -v curl').code === 0)
+		cmd = 'curl -L --connect-timeout 30 --max-time 30 -o ' + qpath + ' ' + qurl;
+	else
+		return { ok: false, output: '未找到 uclient-fetch、wget 或 curl' };
+
+	let res = exec_cmd(cmd);
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	set_cfg('remote', 'url', url);
+	set_cfg('remote', 'last_update_time', now_string());
+	set_cfg('main', 'last_import_time', now_string());
+	set_cfg('main', 'last_import_source', 'remote');
+
+	let checked = check_file(path);
+	set_cfg('main', 'last_check_result', checked.ok ? 'pass' : 'fail');
+	set_cfg('main', 'last_check_time', now_string());
+
+	return { ok: checked.ok, temp_path: path, output: checked.output };
+}
+
+function tail_log(lines, filter) {
+	let path = log_path();
+	if (stat(path)?.type != 'file')
+		return { ok: false, log: '', output: '日志文件不存在：' + path };
+
+	lines = int(lines || cfg('log', 'tail_lines', '200')) || 200;
+	if (lines < 1)
+		lines = 200;
+	if (lines > 2000)
+		lines = 2000;
+
+	let cmd = 'tail -n ' + lines + ' ' + shellquote(path);
+	if (filter == 'ERROR' || filter == 'FATAL')
+		cmd += ' | grep -a ' + shellquote(filter);
+
+	let res = exec_cmd(cmd);
+	return { ok: true, log: res.stdout, size: file_size(path) };
+}
+
+function set_cron() {
+	let cron = '/etc/crontabs/root';
+	let content = readfile(cron) || '';
+	let original = content;
+	let rows = split(content, '\n');
+	let kept = [];
+
+	for (let i = 0; i < length(rows); i++) {
+		if (match(rows[i], /clear sing-box log daily/))
+			continue;
+		if (match(rows[i], /singboxlite remote config update/))
+			continue;
+		if (rows[i] != '' || i < length(rows) - 1)
+			push(kept, rows[i]);
+	}
+
+	content = join('\n', kept);
+	if (content != '')
+		content += '\n';
+
+	let cleanup_time = split(cfg('log', 'cleanup_time', '03:10'), ':');
+	let cleanup_hour = cleanup_time?.[0] || '3';
+	let cleanup_min = cleanup_time?.[1] || '10';
+	let remote_time = split(cfg('remote', 'auto_update_time', '03:00'), ':');
+	let remote_hour = remote_time?.[0] || '3';
+	let remote_min = remote_time?.[1] || '0';
+
+	if (cfg('log', 'cleanup_enabled', '1') == '1')
+		content += cleanup_min + ' ' + cleanup_hour + ' * * * /usr/bin/truncate -s 0 ' + log_path() + ' # clear sing-box log daily\n';
+
+	if (cfg('remote', 'auto_update', '0') == '1')
+		content += remote_min + ' ' + remote_hour + ' * * * /usr/share/singboxlite/auto-update.sh # singboxlite remote config update\n';
+
+	let changed = content != original;
+
+	if (changed) {
+		writefile(cron, content);
+		exec_cmd('/etc/init.d/cron restart');
+	}
+
+	return { ok: true, changed: changed };
+}
+
+const methods = {
+	status: {
+		call: function() {
+			let log = log_path();
+			return {
+				singbox_installed: command_exists('/usr/bin/sing-box'),
+				singbox_running: !!service_running('sing-box'),
+				singbox_version: singbox_version(),
+				singbox_pid: singbox_pid(),
+				mosdns_installed: command_exists('/etc/init.d/mosdns'),
+				mosdns_running: !!service_running('mosdns'),
+				config_path: config_path(),
+				log_path: log,
+				log_size: file_size(log),
+				mode: cfg('main', 'mode', 'singbox_mosdns'),
+				last_check_result: cfg('main', 'last_check_result', ''),
+				last_check_time: cfg('main', 'last_check_time', ''),
+				last_apply_time: cfg('main', 'last_apply_time', ''),
+				remote_url: cfg('remote', 'url', ''),
+				mosdns_addr: cfg('dns', 'mosdns_addr', '127.0.0.1'),
+				mosdns_port: cfg('dns', 'mosdns_port', '5335')
+			};
+		}
+	},
+
+	check_current: {
+		call: function() {
+			let res = check_file(config_path());
+			set_cfg('main', 'last_check_result', res.ok ? 'pass' : 'fail');
+			set_cfg('main', 'last_check_time', now_string());
+			return res;
+		}
+	},
+
+	check_imported: {
+		args: { source: 'local' },
+		call: function(request) {
+			let source = request.args?.source || 'local';
+			let res = check_file(imported_path(source));
+			set_cfg('main', 'last_check_result', res.ok ? 'pass' : 'fail');
+			set_cfg('main', 'last_check_time', now_string());
+			return res;
+		}
+	},
+
+	fetch_remote: {
+		args: { url: '' },
+		call: function(request) {
+			return fetch_remote(request.args?.url);
+		}
+	},
+
+	apply_imported: {
+		args: { source: 'local' },
+		call: function(request) {
+			return apply_imported(request.args?.source || 'local');
+		}
+	},
+
+	backup_current: {
+		call: function() {
+			return backup_current();
+		}
+	},
+
+	restart_singbox: {
+		call: function() {
+			return restart_singbox_internal();
+		}
+	},
+
+	restart_mosdns: {
+		call: function() {
+			return restart_mosdns_internal();
+		}
+	},
+
+	clean_log: {
+		call: function() {
+			let path = log_path();
+			writefile(path, '');
+			return { ok: true, output: '日志已清理' };
+		}
+	},
+
+	tail_log: {
+		args: { lines: 200, filter: '' },
+		call: function(request) {
+			return tail_log(request.args?.lines, request.args?.filter);
+		}
+	},
+
+	set_cron: {
+		call: function() {
+			return set_cron();
+		}
+	}
+};
+
+return { 'luci.singboxlite': methods };

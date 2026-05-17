@@ -1,0 +1,11 @@
+*.ipk
+*.o
+*.so
+*.swp
+*~
+/bin/
+/build_dir/
+/dl/
+/logs/
+/staging_dir/
+/tmp/

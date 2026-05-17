@@ -1,0 +1,36 @@
+{
+	"luci-app-singbox-lite": {
+		"description": "Grant access to SingBox Lite",
+		"read": {
+			"file": {
+				"/etc/init.d/sing-box": [ "exec" ],
+				"/etc/init.d/mosdns": [ "exec" ],
+				"/etc/sing-box/config.json": [ "read" ],
+				"/etc/sing-box/sing-box.log": [ "read" ],
+				"/usr/bin/sing-box": [ "exec" ],
+				"/usr/bin/sing-box-disable-dns-hijack": [ "exec" ],
+				"/tmp/singboxlite/*": [ "read" ]
+			},
+			"ubus": {
+				"file": [ "read" ],
+				"service": [ "list" ],
+				"luci.singboxlite": [ "*" ]
+			},
+			"uci": [ "singboxlite" ]
+		},
+		"write": {
+			"file": {
+				"/etc/crontabs/root": [ "read", "write" ],
+				"/etc/sing-box/config.json": [ "read", "write" ],
+				"/etc/sing-box/config.json.bak-*": [ "write" ],
+				"/etc/sing-box/sing-box.log": [ "read", "write" ],
+				"/tmp/singboxlite/*": [ "read", "write" ]
+			},
+			"ubus": {
+				"file": [ "read", "write" ],
+				"luci.singboxlite": [ "*" ]
+			},
+			"uci": [ "singboxlite" ]
+		}
+	}
+}
