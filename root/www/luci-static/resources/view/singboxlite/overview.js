@@ -54,6 +54,33 @@ function select(id, value, opts) {
 	}));
 }
 
+function setModeValue(mode) {
+	var input = document.getElementById('sbl-mode');
+	var buttons = document.querySelectorAll('.sbl-mode-btn');
+
+	if (input)
+		input.value = mode;
+
+	for (var i = 0; i < buttons.length; i++)
+		buttons[i].classList.toggle('active', buttons[i].getAttribute('data-mode') === mode);
+}
+
+function modePicker(value) {
+	value = value || 'singbox_mosdns';
+
+	return E('div', { 'class': 'sbl-mode-picker' }, [
+		E('input', { id: 'sbl-mode', type: 'hidden', value: value }),
+		E('button', { type: 'button', 'class': 'sbl-mode-btn ' + (value === 'singbox_mosdns' ? 'active' : ''), 'data-mode': 'singbox_mosdns', 'click': function() { setModeValue('singbox_mosdns'); } }, [
+			E('b', {}, 'sing-box + mosdns'),
+			E('span', {}, '联动 MosDNS')
+		]),
+		E('button', { type: 'button', 'class': 'sbl-mode-btn ' + (value === 'singbox_dns' ? 'active' : ''), 'data-mode': 'singbox_dns', 'click': function() { setModeValue('singbox_dns'); } }, [
+			E('b', {}, 'sing-box'),
+			E('span', {}, '原始 JSON')
+		])
+	]);
+}
+
 function toggle(id, checked, text) {
 	return E('label', { 'class': 'sbl-toggle' }, [
 		E('input', { id: id, type: 'checkbox', checked: checked ? true : null }),
@@ -146,6 +173,12 @@ function css() {
 		.sbl-field{display:grid;grid-template-columns:116px minmax(0,1fr);align-items:center;gap:8px;margin:6px 0}
 		.sbl-field>span{font-weight:800;color:#102038;text-align:right}
 		.sbl-input{height:29px;border:1px solid #cbd6e6;border-radius:5px;background:#fff;color:#102038;box-sizing:border-box;padding:0 9px;width:100%;font-size:12px}
+		.sbl-mode-picker{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+		.sbl-mode-btn{min-height:42px;border:1px solid #cbd6e6;border-radius:6px;background:#fff;color:#102038;padding:6px 9px;text-align:left;cursor:pointer}
+		.sbl-mode-btn b{display:block;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbl-mode-btn span{display:block;margin-top:3px;color:#7a8ba3;font-size:11px;line-height:1.2}
+		.sbl-mode-btn.active{border-color:#5b6ee1;background:#eef2ff;color:#4f62df}
+		.sbl-mode-btn.active span{color:#4f62df}
 		.sbl-toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#5f7088;font-weight:700}
 		.sbl-toggle input{display:none}
 		.sbl-switch{position:relative;width:32px;height:17px;border-radius:999px;background:#cbd5e1;display:inline-block}
@@ -260,12 +293,12 @@ return view.extend({
 						E('div', { 'class': 'sbl-settings' }, [
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '基础'),
-								field('运行模式', select('sbl-mode', mode, [ [ 'singbox_mosdns', 'sing-box + mosdns' ], [ 'singbox_dns', 'sing-box' ] ])),
 								field('配置路径', input('sbl-config-path', configPath)),
 								field('日志路径', input('sbl-log-path', logPath))
 							]),
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '远程配置'),
+								field('运行模式', modePicker(mode)),
 								field('远程配置 URL', input('sbl-remote-url', remoteUrl, 'https://example.com/sing-box.json')),
 								field('自动更新', toggle('sbl-remote-auto', remoteAuto, '每天 ' + remoteTime)),
 								field('检查后应用', toggle('sbl-remote-apply', remoteApply, '启用'))
