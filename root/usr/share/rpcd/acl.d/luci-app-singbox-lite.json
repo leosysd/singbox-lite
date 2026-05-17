@@ -5,6 +5,7 @@
 			"file": {
 				"/etc/init.d/sing-box": [ "exec" ],
 				"/etc/init.d/mosdns": [ "exec" ],
+				"/etc/init.d/dnsmasq": [ "exec" ],
 				"/sbin/logread": [ "exec" ],
 				"/etc/sing-box/config.json": [ "read" ],
 				"/etc/sing-box/sing-box.log": [ "read" ],
@@ -13,6 +14,7 @@
 				"/usr/bin/sing-box": [ "exec" ],
 				"/usr/bin/sing-box-disable-dns-hijack": [ "exec" ],
 				"/usr/share/singboxlite/prepare-mosdns-config.uc": [ "exec" ],
+				"/usr/share/singboxlite/prepare-singbox-config.uc": [ "exec" ],
 				"/usr/share/singboxlite/sing-box-disable-dns-hijack.sh": [ "read" ],
 				"/usr/share/singboxlite/update-geosite-rules.sh": [ "exec" ],
 				"/etc/sing-box/rule-set/*": [ "read" ],

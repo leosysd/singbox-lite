@@ -10,6 +10,7 @@ var callStatus = rpc.declare({ object: 'luci.singboxlite', method: 'status', exp
 var callCheckCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'check_current', expect: { '': {} } });
 var callBackup = rpc.declare({ object: 'luci.singboxlite', method: 'backup_current', expect: { '': {} } });
 var callDeleteBackups = rpc.declare({ object: 'luci.singboxlite', method: 'delete_backups', expect: { '': {} } });
+var callStartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'start_singbox', expect: { '': {} } });
 var callRestartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'restart_singbox', expect: { '': {} } });
 var callRestartMosdns = rpc.declare({ object: 'luci.singboxlite', method: 'restart_mosdns', expect: { '': {} } });
 var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_remote', params: [ 'url' ], expect: { '': {} } });
@@ -239,6 +240,16 @@ return view.extend({
 		var disableDnsHijack = uci.get('singboxlite', 'dns', 'disable_dns_hijack') !== '0';
 		var restartMosdns = uci.get('singboxlite', 'dns', 'restart_mosdns_after_apply') !== '0';
 		var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
+		var activeMode = status.mode || mode;
+		var dnsTitle = activeMode === 'singbox_mosdns'
+			? 'MosDNS ' + (status.mosdns_addr || mosdnsAddr) + ':' + (status.mosdns_port || mosdnsPort)
+			: 'sing-box 接管';
+		var dnsMeta = activeMode === 'singbox_mosdns'
+			? (status.dns_hijack_script_installed ? 'DNS DNAT 清理脚本已安装' : 'DNS DNAT 清理脚本未安装')
+			: (status.dns_hijack_script_installed ? '清理脚本仍存在' : 'DNS 劫持由 sing-box 处理');
+		var dnsTone = activeMode === 'singbox_mosdns'
+			? (status.mosdns_running ? 'ok' : 'warn')
+			: (status.dns_hijack_script_installed ? 'warn' : 'ok');
 
 		return E('div', { 'class': 'sbl-page' }, [
 			css(),
@@ -262,6 +273,7 @@ return view.extend({
 							])
 						]);
 					} }, '× 删除备份'),
+					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callStartSingbox().then(function(res) { notify('启动 sing-box', res); }); } }, '▶ 启动 sing-box'),
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartSingbox().then(function(res) { notify('重启 sing-box', res); }); } }, '↻ 重启 sing-box'),
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '↻ 重启 MosDNS'),
 					E('button', { 'class': 'sbl-btn', 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '= 查看日志')
@@ -270,8 +282,8 @@ return view.extend({
 			E('div', { 'class': 'sbl-stats' }, [
 				statCard('sing-box', status.singbox_running ? '运行中' : (status.singbox_installed ? '未运行' : '未安装'), (status.singbox_version || '').replace(/^sing-box /, '') + (status.singbox_pid ? ' · PID ' + status.singbox_pid : ''), status.singbox_running ? 'ok' : 'warn'),
 				statCard('配置', status.config_path || configPath, '备份 ' + (status.backup_count || 0) + ' 个 · 上次应用 -'),
-				statCard('DNS', 'MosDNS ' + (status.mosdns_addr || mosdnsAddr) + ':' + (status.mosdns_port || mosdnsPort), status.dns_hijack_script_installed ? 'DNS DNAT 清理脚本已安装' : 'DNS DNAT 清理脚本未安装', status.mosdns_running ? 'ok' : 'warn'),
-				statCard('模式', modeText(status.mode || mode), (status.mode === 'singbox_mosdns' || mode === 'singbox_mosdns') ? '会替换导入配置的 DNS 段' : '应用原始 JSON')
+				statCard('DNS', dnsTitle, dnsMeta, dnsTone),
+				statCard('模式', modeText(activeMode), activeMode === 'singbox_mosdns' ? '会替换导入配置的 DNS 段' : '由 sing-box 接管 DNS')
 			]),
 			E('div', { 'class': 'sbl-grid' }, [
 				E('div', {}, [

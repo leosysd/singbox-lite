@@ -13,9 +13,11 @@ const DEFAULT_TEMP_DIR = '/tmp/singboxlite';
 const LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
 const REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
 const MOSDNS_TEMP = '/tmp/singboxlite/import-mosdns.json';
+const SINGBOX_TEMP = '/tmp/singboxlite/import-singbox.json';
 const DNS_HIJACK_BIN = '/usr/bin/sing-box-disable-dns-hijack';
 const DNS_HIJACK_TEMPLATE = '/usr/share/singboxlite/sing-box-disable-dns-hijack.sh';
 const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
+const SINGBOX_PREPARE = '/usr/share/singboxlite/prepare-singbox-config.uc';
 const RULESET_UPDATER = '/usr/share/singboxlite/update-geosite-rules.sh';
 const RULESET_LOG = '/tmp/singboxlite-ruleset.log';
 
@@ -213,6 +215,23 @@ function restart_singbox_internal() {
 	return { ok: true, output: res.stdout || 'sing-box 已重启' };
 }
 
+function start_singbox_internal() {
+	if (stat('/etc/init.d/sing-box')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
+
+	let res = exec_cmd('/etc/init.d/sing-box start');
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	exec_cmd('sleep 2');
+
+	let status = exec_cmd('/etc/init.d/sing-box status');
+	if (status.code !== 0 || !match(status.stdout, /running/i))
+		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'sing-box 启动后未保持运行')) };
+
+	return { ok: true, output: res.stdout || 'sing-box 已启动' };
+}
+
 function restart_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
@@ -229,29 +248,22 @@ function stop_mosdns_internal() {
 	return { ok: res.code === 0, output: res.stdout };
 }
 
-function dnsmasq_uses_mosdns() {
+function cleanup_dnsmasq_mosdns_upstream() {
 	let port = mosdns_port();
-	let refs = [
-		"server='" + mosdns_addr() + '#' + port + "'",
-		"server='127.0.0.1#" + port + "'",
-		"server='::1#" + port + "'",
-		"server='localhost#" + port + "'"
+	let servers = [
+		mosdns_addr() + '#' + port,
+		'127.0.0.1#' + port,
+		'::1#' + port,
+		'localhost#' + port
 	];
+	let cmd = '';
 
-	for (let i = 0; i < length(refs); i++) {
-		let res = exec_cmd('uci -q show dhcp | grep -F ' + shellquote(refs[i]) + ' >/dev/null');
-		if (res.code === 0)
-			return true;
-	}
+	for (let i = 0; i < length(servers); i++)
+		cmd += 'uci -q del_list dhcp.@dnsmasq[0].server=' + shellquote(servers[i]) + ' 2>/dev/null || true; ';
 
-	return false;
-}
-
-function stop_mosdns_for_singbox_mode() {
-	if (dnsmasq_uses_mosdns())
-		return { ok: true, skipped: true, output: '检测到 dnsmasq 仍转发到 MosDNS，已保留 MosDNS 运行以避免断网' };
-
-	return stop_mosdns_internal();
+	cmd += "uci -q set dhcp.@dnsmasq[0].noresolv='0'; uci -q commit dhcp; /etc/init.d/dnsmasq restart";
+	let res = exec_cmd(cmd);
+	return { ok: res.code === 0, output: res.stdout || '已清理 dnsmasq MosDNS 上游并重启 dnsmasq' };
 }
 
 function install_dns_hijack_script() {
@@ -267,14 +279,6 @@ function uninstall_dns_hijack_script() {
 	return { ok: res.code === 0, output: res.stdout || '已卸载 DNS DNAT 清理脚本' };
 }
 
-function run_dns_hijack_script() {
-	if (stat(DNS_HIJACK_BIN)?.type != 'file')
-		return { ok: false, output: '未找到 ' + DNS_HIJACK_BIN };
-
-	let res = exec_cmd(shellquote(DNS_HIJACK_BIN));
-	return { ok: res.code === 0, output: res.stdout || '已清理 sing-box auto_redirect DNS DNAT' };
-}
-
 function prepare_mosdns_config(source) {
 	ensure_temp_dir();
 
@@ -288,9 +292,29 @@ function prepare_mosdns_config(source) {
 	return { ok: true, path: MOSDNS_TEMP, output: '已生成 MosDNS 模式配置：' + MOSDNS_TEMP };
 }
 
+function prepare_singbox_config(source) {
+	ensure_temp_dir();
+
+	if (stat(SINGBOX_PREPARE)?.type != 'file')
+		return { ok: false, output: '缺少 sing-box 配置处理脚本：' + SINGBOX_PREPARE };
+
+	let res = exec_cmd(shellquote(SINGBOX_PREPARE) + ' ' + shellquote(source) + ' ' + shellquote(SINGBOX_TEMP));
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	return { ok: true, path: SINGBOX_TEMP, output: '已生成 sing-box 模式配置：' + SINGBOX_TEMP };
+}
+
 function check_for_mode(path) {
-	if (current_mode() != 'singbox_mosdns')
-		return check_file(path);
+	if (current_mode() != 'singbox_mosdns') {
+		let prepared = prepare_singbox_config(path);
+		if (!prepared.ok)
+			return prepared;
+
+		let checked = check_file(prepared.path);
+		checked.prepared_path = prepared.path;
+		return checked;
+	}
 
 	let prepared = prepare_mosdns_config(path);
 	if (!prepared.ok)
@@ -314,6 +338,12 @@ function apply_imported(source) {
 			return { ok: false, step: 'prepare', output: prepared.output };
 
 		apply_path = prepared.path;
+	} else {
+		prepared = prepare_singbox_config(path);
+		if (!prepared.ok)
+			return { ok: false, step: 'prepare', output: prepared.output };
+
+		apply_path = prepared.path;
 	}
 
 	checked = check_file(apply_path);
@@ -327,7 +357,11 @@ function apply_imported(source) {
 	if (!script.ok)
 		return { ok: false, step: 'dns_hijack_script', output: script.output };
 
-	let mosdns = mode == 'singbox_dns' ? stop_mosdns_for_singbox_mode() : { ok: true, skipped: true };
+	let dnsmasq = mode == 'singbox_dns' ? cleanup_dnsmasq_mosdns_upstream() : { ok: true, skipped: true };
+	if (!dnsmasq.ok)
+		return { ok: false, step: 'dnsmasq', output: dnsmasq.output };
+
+	let mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns.ok)
 		return { ok: false, step: 'mosdns', output: mosdns.output };
 
@@ -350,11 +384,6 @@ function apply_imported(source) {
 	let restarted = restart_singbox_internal();
 	let cleanup = { ok: true, skipped: true };
 
-	if (mode == 'singbox_mosdns' && disable_dns_hijack())
-		cleanup = run_dns_hijack_script();
-	else
-		mosdns = mode == 'singbox_dns' ? stop_mosdns_for_singbox_mode() : mosdns;
-
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
 
@@ -366,6 +395,7 @@ function apply_imported(source) {
 		mode: mode,
 		prepared_path: prepared?.path || '',
 		script: script,
+		dnsmasq: dnsmasq,
 		mosdns: mosdns,
 		mosdns_after: mosdns_after,
 		dns_hijack_cleanup: cleanup
@@ -670,6 +700,12 @@ const methods = {
 	restart_singbox: {
 		call: function() {
 			return restart_singbox_internal();
+		}
+	},
+
+	start_singbox: {
+		call: function() {
+			return start_singbox_internal();
 		}
 	},
 

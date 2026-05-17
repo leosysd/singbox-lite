@@ -13,9 +13,11 @@ RESTART_MOSDNS_AFTER_APPLY="$(uci -q get singboxlite.dns.restart_mosdns_after_ap
 TEMP_DIR="$(uci -q get singboxlite.main.temp_dir || echo /tmp/singboxlite)"
 TEMP_FILE="$TEMP_DIR/import-remote.json"
 MOSDNS_FILE="$TEMP_DIR/import-mosdns.json"
+SINGBOX_FILE="$TEMP_DIR/import-singbox.json"
 DNS_HIJACK_BIN="/usr/bin/sing-box-disable-dns-hijack"
 DNS_HIJACK_TEMPLATE="/usr/share/singboxlite/sing-box-disable-dns-hijack.sh"
 PREPARE_MOSDNS="/usr/share/singboxlite/prepare-mosdns-config.uc"
+PREPARE_SINGBOX="/usr/share/singboxlite/prepare-singbox-config.uc"
 LOG_PREFIX="singboxlite auto-update:"
 
 case "$CONFIG_PATH" in
@@ -52,21 +54,14 @@ stop_mosdns() {
 	[ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns stop >/dev/null 2>&1 || true
 }
 
-dnsmasq_uses_mosdns() {
-	uci -q show dhcp | grep -F "server='${MOSDNS_ADDR}#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
-	uci -q show dhcp | grep -F "server='127.0.0.1#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
-	uci -q show dhcp | grep -F "server='::1#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
-	uci -q show dhcp | grep -F "server='localhost#${MOSDNS_PORT}'" >/dev/null 2>&1 && return 0
-	return 1
-}
-
-stop_mosdns_for_singbox_mode() {
-	if dnsmasq_uses_mosdns; then
-		logger -t singboxlite "$LOG_PREFIX dnsmasq still forwards to MosDNS, keep mosdns running to avoid DNS outage"
-		return 0
-	fi
-
-	stop_mosdns
+cleanup_dnsmasq_mosdns_upstream() {
+	uci -q del_list dhcp.@dnsmasq[0].server="${MOSDNS_ADDR}#${MOSDNS_PORT}" 2>/dev/null || true
+	uci -q del_list dhcp.@dnsmasq[0].server="127.0.0.1#${MOSDNS_PORT}" 2>/dev/null || true
+	uci -q del_list dhcp.@dnsmasq[0].server="::1#${MOSDNS_PORT}" 2>/dev/null || true
+	uci -q del_list dhcp.@dnsmasq[0].server="localhost#${MOSDNS_PORT}" 2>/dev/null || true
+	uci -q set dhcp.@dnsmasq[0].noresolv='0'
+	uci -q commit dhcp
+	[ -x /etc/init.d/dnsmasq ] && /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 }
 
 restart_mosdns() {
@@ -129,6 +124,16 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 		exit 1
 	}
 	APPLY_FILE="$MOSDNS_FILE"
+else
+	[ -x "$PREPARE_SINGBOX" ] || {
+		log_result "missing sing-box config prepare helper"
+		exit 1
+	}
+	"$PREPARE_SINGBOX" "$TEMP_FILE" "$SINGBOX_FILE" >/tmp/singboxlite-prepare.log 2>&1 || {
+		log_result "prepare sing-box config failed"
+		exit 1
+	}
+	APPLY_FILE="$SINGBOX_FILE"
 fi
 
 /usr/bin/sing-box check -c "$APPLY_FILE" >/tmp/singboxlite-check.log 2>&1 || {
@@ -155,7 +160,8 @@ if [ "$MODE" = "singbox_mosdns" ]; then
 	fi
 else
 	uninstall_dns_hijack_script
-	stop_mosdns_for_singbox_mode
+	cleanup_dnsmasq_mosdns_upstream
+	stop_mosdns
 fi
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
@@ -168,17 +174,6 @@ fi
 cp "$APPLY_FILE" "$CONFIG_PATH"
 [ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS_AFTER_APPLY" = "1" ] && restart_mosdns
 restart_singbox
-
-if [ "$MODE" = "singbox_mosdns" ]; then
-	if [ "$DISABLE_DNS_HIJACK" = "1" ]; then
-		"$DNS_HIJACK_BIN" >/dev/null 2>&1 || {
-			log_result "applied, but DNS hijack cleanup failed"
-			exit 1
-		}
-	fi
-else
-	stop_mosdns_for_singbox_mode
-fi
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"
 uci -q commit singboxlite
