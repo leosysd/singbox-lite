@@ -76,6 +76,12 @@ lock_update() {
 	trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
 }
 
+service_running() {
+	local service="$1"
+	[ -x "/etc/init.d/$service" ] || return 1
+	"/etc/init.d/$service" status >/dev/null 2>&1
+}
+
 fetch_file() {
 	local name="$1"
 	local tmp="$TMP_DIR/$name.tmp"
@@ -133,14 +139,20 @@ update_rules() {
 	install_file "$TMP_DIR/direct-geosite.txt.tmp" "$MOSDNS_DIR/direct-geosite.txt"
 	install_file "$TMP_DIR/proxy-geosite.txt.tmp" "$MOSDNS_DIR/proxy-geosite.txt"
 
-	if [ "$SINGBOX_RESTART" = "1" ] && [ -x /etc/init.d/sing-box ]; then
-		log "restart sing-box"
-		/etc/init.d/sing-box restart >> "$LOG_FILE" 2>&1 || die "failed to restart sing-box"
-	fi
-
-	if [ "$MOSDNS_RESTART" = "1" ] && [ -x /etc/init.d/mosdns ]; then
+	if [ "$MOSDNS_RESTART" = "1" ] && service_running mosdns; then
 		log "restart mosdns"
 		/etc/init.d/mosdns restart >> "$LOG_FILE" 2>&1 || die "failed to restart mosdns"
+		log "wait 10 seconds after mosdns restart"
+		sleep 10
+	elif [ "$MOSDNS_RESTART" = "1" ]; then
+		log "skip mosdns restart because mosdns is not running"
+	fi
+
+	if [ "$SINGBOX_RESTART" = "1" ] && service_running sing-box; then
+		log "restart sing-box"
+		/etc/init.d/sing-box restart >> "$LOG_FILE" 2>&1 || die "failed to restart sing-box"
+	elif [ "$SINGBOX_RESTART" = "1" ]; then
+		log "skip sing-box restart because sing-box is not running"
 	fi
 
 	rm -rf "$TMP_DIR"
