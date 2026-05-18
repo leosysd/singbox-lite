@@ -44,6 +44,17 @@ config.dns = {
 	reverse_mapping: true
 };
 
+if (type(config.inbounds) == 'array') {
+	for (let i = 0; i < length(config.inbounds); i++) {
+		let inbound = config.inbounds[i];
+
+		if (type(inbound) == 'object' && inbound.type == 'tun') {
+			inbound.auto_route = true;
+			inbound.auto_redirect = true;
+		}
+	}
+}
+
 if (type(config.route) == 'object') {
 	if (type(config.route.rules) == 'array') {
 		let rules = [];
