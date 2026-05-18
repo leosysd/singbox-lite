@@ -44,7 +44,7 @@ uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxli
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
 uci -q set singboxlite.main.source_path='/etc/sing-box/singboxlite/source.json'
-[ -f /etc/sing-box/config.json ] && cp -p /etc/sing-box/config.json /etc/sing-box/singboxlite/source.json
+[ ! -f /etc/sing-box/singboxlite/source.json ] && [ -f /etc/sing-box/config.json ] && cp -p /etc/sing-box/config.json /etc/sing-box/singboxlite/source.json
 [ -f /etc/sing-box/singboxlite-source.json ] && rm -f /etc/sing-box/singboxlite-source.json
 rm -rf /tmp/singboxlite
 rm -f /etc/sing-box/config.json.bak-singboxlite-*
