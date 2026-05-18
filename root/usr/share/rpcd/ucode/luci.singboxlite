@@ -64,9 +64,12 @@ function exec_cmd(cmd) {
 }
 
 function cfg(section, option, fallback) {
-	let value = uci.get('singboxlite', section, option);
+	let res = exec_cmd('uci -q get singboxlite.' + section + '.' + option);
+	let value = res.code === 0 ? res.stdout : null;
+
 	if (value == null || value === '')
 		return fallback;
+
 	return value;
 }
 
@@ -306,7 +309,7 @@ function start_mosdns_for_apply() {
 	if (res.code !== 0)
 		return { ok: false, output: res.stdout };
 
-	wait_seconds(3);
+	wait_seconds(10);
 
 	let status = exec_cmd('/etc/init.d/mosdns status');
 	if (status.code !== 0 || !match(status.stdout, /running/i))
