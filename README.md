@@ -27,6 +27,14 @@ rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
 /etc/init.d/uhttpd reload || /etc/init.d/uhttpd restart
 ```
 
+## 自动发布
+
+仓库内置 GitHub Actions：
+
+- 推送 `v*` 标签时自动构建 `.apk` 并上传到对应 Release。
+- 也可以在 Actions 页面手动运行 `Build and Release APK`，填写要发布的 tag。
+- 工作流会从 OpenWrt x86/64 snapshot SDK 获取 `apk mkpkg` 工具，生成 noarch 安装包，并校验 `prepare-*.uc` helper 具备执行权限。
+
 ## 功能
 
 - 显示 sing-box / MosDNS 运行状态。
