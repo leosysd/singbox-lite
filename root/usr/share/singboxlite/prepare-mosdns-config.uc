@@ -67,6 +67,55 @@ function ensure_direct_dns_upstreams(route) {
 	}
 }
 
+function remove_remote_dns_direct_cidrs(route) {
+	let remote_dns = [
+		'1.1.1.1/32',
+		'1.0.0.1/32',
+		'8.8.8.8/32',
+		'8.8.4.4/32',
+		'104.16.248.249/32',
+		'104.16.249.249/32'
+	];
+
+	if (type(route) != 'object' || type(route.rules) != 'array')
+		return;
+
+	for (let i = 0; i < length(route.rules); i++) {
+		let rule = route.rules[i];
+
+		if (type(rule) != 'object' || rule.outbound != 'direct' || type(rule.ip_cidr) != 'array')
+			continue;
+
+		let cidrs = [];
+		for (let j = 0; j < length(rule.ip_cidr); j++) {
+			if (!array_has(remote_dns, rule.ip_cidr[j]))
+				push(cidrs, rule.ip_cidr[j]);
+		}
+		rule.ip_cidr = cidrs;
+	}
+}
+
+function server_is_domain(server) {
+	return type(server) == 'string' && server != '' && !match(server, /^[0-9.]+$/) && !match(server, /^\[/);
+}
+
+function outbound_server_domains(config) {
+	let domains = [];
+
+	if (type(config.outbounds) != 'array')
+		return domains;
+
+	for (let i = 0; i < length(config.outbounds); i++) {
+		let outbound = config.outbounds[i];
+		let server = type(outbound) == 'object' ? outbound.server : null;
+
+		if (server_is_domain(server) && !array_has(domains, server))
+			push(domains, server);
+	}
+
+	return domains;
+}
+
 let source = ARGV[0] || '';
 let target = ARGV[1] || '';
 let mosdns_addr = ARGV[2] || '127.0.0.1';
@@ -96,11 +145,27 @@ config.dns = {
 		tag: 'mosdns',
 		server: mosdns_addr,
 		server_port: mosdns_port
+	},
+	{
+		type: 'udp',
+		tag: 'direct-dns',
+		server: '223.5.5.5',
+		server_port: 53
 	}
 	],
+	rules: [],
 	final: 'mosdns',
 	reverse_mapping: true
 };
+
+let outbound_domains = outbound_server_domains(config);
+if (length(outbound_domains) > 0) {
+	push(config.dns.rules, {
+		action: 'route',
+		domain: outbound_domains,
+		server: 'direct-dns'
+	});
+}
 
 if (type(config.inbounds) == 'array') {
 	for (let i = 0; i < length(config.inbounds); i++) {
@@ -130,6 +195,7 @@ if (type(config.route) == 'object') {
 	}
 
 	config.route.default_domain_resolver = 'mosdns';
+	remove_remote_dns_direct_cidrs(config.route);
 	ensure_direct_dns_upstreams(config.route);
 }
 
