@@ -8,6 +8,25 @@ SingBox Lite 是一个面向 OpenWrt 的轻量 LuCI App，用来安全导入和�
 2. 导入远程 URL sing-box JSON 配置。
 3. 选择运行模式，尤其是 `sing-box + mosdns`。
 
+## 发布包
+
+最新成品包固定下载地址：
+
+```text
+https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite-0.1.0-r1.apk
+```
+
+路由器上可直接拉取并安装：
+
+```sh
+cd /tmp
+wget -O luci-app-singbox-lite-0.1.0-r1.apk https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite-0.1.0-r1.apk
+apk add --allow-untrusted --force-overwrite /tmp/luci-app-singbox-lite-0.1.0-r1.apk
+rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
+/etc/init.d/rpcd restart
+/etc/init.d/uhttpd reload || /etc/init.d/uhttpd restart
+```
+
 ## 功能
 
 - 显示 sing-box / MosDNS 运行状态。
