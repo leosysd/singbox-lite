@@ -37,6 +37,15 @@ function reloadAfterApply(res) {
 	return res;
 }
 
+function isTimeoutError(e) {
+	return e && /timed out/i.test(String(e.message || e));
+}
+
+function reloadAfterPendingApply() {
+	ui.addNotification(null, E('p', {}, '应用过程仍在后台执行，页面将在稍后刷新状态'), 'info');
+	window.setTimeout(function() { location.reload(); }, 15000);
+}
+
 function val(id) {
 	var el = document.getElementById(id);
 	return el ? el.value : '';
@@ -149,6 +158,11 @@ function saveAndApplyAll() {
 		notify('保存并应用', res);
 		return reloadAfterApply(res);
 	}).catch(function(e) {
+		if (isTimeoutError(e)) {
+			reloadAfterPendingApply();
+			return;
+		}
+
 		if (e)
 			L.error(e);
 	});
