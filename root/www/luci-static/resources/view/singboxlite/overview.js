@@ -371,7 +371,7 @@ return view.extend({
 								field('MosDNS 地址', input('sbl-mosdns-addr', mosdnsAddr)),
 								field('MosDNS 端口', input('sbl-mosdns-port', mosdnsPort)),
 								field('禁用 DNS 劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
-								field('应用顺序', E('span', { 'class': 'sbl-muted' }, 'MosDNS 模式会先启动 MosDNS，等待 3 秒确认运行，再启动 sing-box'))
+								field('应用顺序', E('span', { 'class': 'sbl-muted' }, 'MosDNS 模式会先启动 MosDNS，等待 10 秒确认运行，再启动 sing-box'))
 							]),
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '维护'),
