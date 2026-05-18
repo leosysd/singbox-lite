@@ -162,7 +162,7 @@ start_mosdns_for_apply() {
 	uci -q set mosdns.config.local_dns_redirect='0'
 	uci -q commit mosdns
 	/etc/init.d/mosdns restart
-	sleep 3
+	sleep 10
 	/etc/init.d/mosdns status >/dev/null 2>&1 || {
 		log_result "mosdns start failed"
 		exit 1
