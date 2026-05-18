@@ -49,8 +49,8 @@ prepare_sdk() {
 	fi
 
 	if [ ! -f "$SDK_DIR/private-key.pem" ]; then
-		echo "OpenWrt SDK private-key.pem not found in $SDK_DIR" >&2
-		exit 1
+		STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/openssl" ecparam -name prime256v1 -genkey -noout -out "$SDK_DIR/private-key.pem"
+		STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/openssl" ec -in "$SDK_DIR/private-key.pem" -pubout -out "$SDK_DIR/public-key.pem"
 	fi
 }
 
@@ -120,7 +120,7 @@ build_package() {
 		--script "post-install:$SCRIPT_DIR/post-install" \
 		--script "post-upgrade:$SCRIPT_DIR/post-install" \
 		--files "$BUILD_ROOT" \
-		--sign "$SDK_DIR/private-key.pem" \
+		--sign-key "$SDK_DIR/private-key.pem" \
 		--output "$OUT_DIR/$PKG_FILE"
 }
 
