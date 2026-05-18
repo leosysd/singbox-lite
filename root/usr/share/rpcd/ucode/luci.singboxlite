@@ -196,6 +196,14 @@ function check_file(path) {
 	return { ok: res.code === 0, output: res.stdout };
 }
 
+function format_config_file(path) {
+	if (!command_exists('/usr/bin/sing-box'))
+		return { ok: false, output: '未找到 /usr/bin/sing-box' };
+
+	let res = exec_cmd('/usr/bin/sing-box format -w -c ' + shellquote(path));
+	return { ok: res.code === 0, output: res.stdout || '已使用 sing-box format 格式化配置' };
+}
+
 function imported_path(source) {
 	return source == 'remote' ? REMOTE_TEMP : LOCAL_TEMP;
 }
@@ -227,6 +235,10 @@ function restart_singbox_internal() {
 	return { ok: true, output: res.stdout || 'sing-box 已重启' };
 }
 
+function wait_seconds(seconds) {
+	exec_cmd('sleep ' + int(seconds || 1));
+}
+
 function start_singbox_internal() {
 	if (stat('/etc/init.d/sing-box')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
@@ -252,6 +264,23 @@ function stop_singbox_internal() {
 	return { ok: res.code === 0, output: res.stdout || 'sing-box 已停止' };
 }
 
+function stop_singbox_for_apply() {
+	if (stat('/etc/init.d/sing-box')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
+
+	let res = exec_cmd('/etc/init.d/sing-box stop');
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	wait_seconds(1);
+
+	let status = exec_cmd('/etc/init.d/sing-box status');
+	if (status.code === 0 && match(status.stdout, /running/i))
+		return { ok: false, output: status.stdout || 'sing-box 停止后仍在运行' };
+
+	return { ok: true, output: res.stdout || 'sing-box 已停止' };
+}
+
 function restart_mosdns_internal() {
 	if (stat('/etc/init.d/mosdns')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
@@ -262,6 +291,28 @@ function restart_mosdns_internal() {
 	uci.commit('mosdns');
 	let res = exec_cmd('/etc/init.d/mosdns restart');
 	return { ok: res.code === 0, output: res.stdout };
+}
+
+function start_mosdns_for_apply() {
+	if (stat('/etc/init.d/mosdns')?.type != 'file')
+		return { ok: false, output: '未找到 /etc/init.d/mosdns' };
+
+	uci.set('mosdns', 'config', 'enabled', '1');
+	uci.set('mosdns', 'config', 'redirect', '1');
+	uci.set('mosdns', 'config', 'local_dns_redirect', '0');
+	uci.commit('mosdns');
+
+	let res = exec_cmd('/etc/init.d/mosdns restart');
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	wait_seconds(3);
+
+	let status = exec_cmd('/etc/init.d/mosdns status');
+	if (status.code !== 0 || !match(status.stdout, /running/i))
+		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'MosDNS 启动后未保持运行')) };
+
+	return { ok: true, output: res.stdout || 'MosDNS 已启动' };
 }
 
 function enable_mosdns_internal() {
@@ -277,7 +328,16 @@ function stop_mosdns_internal() {
 		return { ok: true, skipped: true, output: '未找到 /etc/init.d/mosdns' };
 
 	let res = exec_cmd("uci -q set mosdns.config.redirect='0'; uci -q set mosdns.config.local_dns_redirect='0'; uci -q set mosdns.config.enabled='0'; uci -q commit mosdns; /etc/init.d/mosdns stop");
-	return { ok: res.code === 0, output: res.stdout };
+	if (res.code !== 0)
+		return { ok: false, output: res.stdout };
+
+	wait_seconds(1);
+
+	let status = exec_cmd('/etc/init.d/mosdns status');
+	if (status.code === 0 && match(status.stdout, /running/i))
+		return { ok: false, output: status.stdout || 'MosDNS 停止后仍在运行' };
+
+	return { ok: true, output: res.stdout || 'MosDNS 已停止' };
 }
 
 function cleanup_dnsmasq_mosdns_upstream() {
@@ -299,6 +359,9 @@ function cleanup_dnsmasq_mosdns_upstream() {
 }
 
 function install_dns_hijack_script() {
+	if (stat(DNS_HIJACK_BIN)?.type == 'file')
+		return { ok: true, skipped: true, output: 'DNS DNAT 清理脚本已安装' };
+
 	if (stat(DNS_HIJACK_TEMPLATE)?.type != 'file')
 		return { ok: false, output: '缺少模板脚本：' + DNS_HIJACK_TEMPLATE };
 
@@ -307,6 +370,9 @@ function install_dns_hijack_script() {
 }
 
 function uninstall_dns_hijack_script() {
+	if (stat(DNS_HIJACK_BIN)?.type != 'file')
+		return { ok: true, skipped: true, output: 'DNS DNAT 清理脚本未安装' };
+
 	let res = exec_cmd('rm -f ' + shellquote(DNS_HIJACK_BIN));
 	return { ok: res.code === 0, output: res.stdout || '已卸载 DNS DNAT 清理脚本' };
 }
@@ -329,6 +395,10 @@ function prepare_mosdns_config(source) {
 	if (res.code !== 0)
 		return { ok: false, output: res.stdout };
 
+	let formatted = format_config_file(MOSDNS_TEMP);
+	if (!formatted.ok)
+		return formatted;
+
 	return { ok: true, path: MOSDNS_TEMP, output: '已生成 MosDNS 模式配置：' + MOSDNS_TEMP };
 }
 
@@ -341,6 +411,10 @@ function prepare_singbox_config(source) {
 	let res = exec_cmd(shellquote(SINGBOX_PREPARE) + ' ' + shellquote(source) + ' ' + shellquote(SINGBOX_TEMP));
 	if (res.code !== 0)
 		return { ok: false, output: res.stdout };
+
+	let formatted = format_config_file(SINGBOX_TEMP);
+	if (!formatted.ok)
+		return formatted;
 
 	return { ok: true, path: SINGBOX_TEMP, output: '已生成 sing-box 模式配置：' + SINGBOX_TEMP };
 }
@@ -433,6 +507,10 @@ function apply_config(path, source) {
 	if (!source_store.ok)
 		return { ok: false, step: 'source_store', output: source_store.output };
 
+	let stopped = stop_singbox_for_apply();
+	if (!stopped.ok)
+		return { ok: false, step: 'stop_singbox', output: stopped.output };
+
 	let script = mode == 'singbox_mosdns' && disable_dns_hijack()
 		? install_dns_hijack_script()
 		: uninstall_dns_hijack_script();
@@ -461,13 +539,13 @@ function apply_config(path, source) {
 	if (copied.code !== 0)
 		return { ok: false, step: 'copy', output: copied.stdout, backup: backup.backup };
 
-	let mosdns_after = mode == 'singbox_mosdns' && restart_mosdns_after_apply()
-		? restart_mosdns_internal()
+	let mosdns_after = mode == 'singbox_mosdns'
+		? start_mosdns_for_apply()
 		: { ok: true, skipped: true };
 	if (!mosdns_after.ok)
 		return { ok: false, step: 'mosdns_after_apply', output: mosdns_after.output, backup: backup.backup };
 
-	let restarted = restart_singbox_internal();
+	let restarted = start_singbox_internal();
 	let dns_hijack_cleanup = mode == 'singbox_mosdns' && disable_dns_hijack() && restarted.ok
 		? run_dns_hijack_script()
 		: { ok: true, skipped: true };
@@ -492,6 +570,7 @@ function apply_config(path, source) {
 		mosdns: mosdns,
 		mosdns_enable: mosdns_enable,
 		mosdns_after: mosdns_after,
+		stopped: stopped,
 		dns_hijack_cleanup: dns_hijack_cleanup,
 		stage_cleanup: cleanup
 	};

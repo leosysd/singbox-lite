@@ -121,7 +121,7 @@ function saveSettings(message, applyCron, applyNow) {
 		mosdns_addr: val('sbl-mosdns-addr') || '127.0.0.1',
 		mosdns_port: val('sbl-mosdns-port') || '5335',
 		disable_dns_hijack: yes('sbl-disable-dns-hijack'),
-		restart_mosdns: yes('sbl-mosdns-restart'),
+			restart_mosdns: true,
 		clean_log: yes('sbl-clean-log'),
 		tail_lines: val('sbl-tail-lines') || '200'
 	}).then(function() {
@@ -364,7 +364,7 @@ return view.extend({
 								field('MosDNS 地址', input('sbl-mosdns-addr', mosdnsAddr)),
 								field('MosDNS 端口', input('sbl-mosdns-port', mosdnsPort)),
 								field('禁用 DNS 劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
-								field('应用后重启', toggle('sbl-mosdns-restart', restartMosdns, '启用'))
+								field('应用顺序', E('span', { 'class': 'sbl-muted' }, 'MosDNS 模式会先启动 MosDNS，等待 3 秒确认运行，再启动 sing-box'))
 							]),
 							E('div', { 'class': 'sbl-section' }, [
 								E('h4', {}, '维护'),

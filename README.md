@@ -13,6 +13,7 @@ SingBox Lite 是一个面向 OpenWrt 的轻量 LuCI App，用来安全导入和�
 - 显示 sing-box / MosDNS 运行状态。
 - 上传本地 JSON 到 `/etc/sing-box/singboxlite/` 并检查。
 - 拉取远程 JSON 到 `/etc/sing-box/singboxlite/` 并检查。
+- 生成待应用 JSON 后使用 `sing-box format -w -c` 做官方格式化。
 - 执行 `sing-box check` 后才允许应用配置。
 - 应用前自动备份 `/etc/sing-box/config.json`，只保留一个滚动备份。
 - 支持 `sing-box` 与 `sing-box + mosdns` 两种运行模式。
@@ -58,25 +59,33 @@ SingBox Lite 导入目录：/etc/sing-box/singboxlite
 ```text
 sing-box 模式：
 导入本地 JSON 或下载远程 JSON
-执行 sing-box check -c 原始 JSON
-卸载 /usr/bin/sing-box-disable-dns-hijack
+生成 sing-box 模式待应用 JSON
+执行 sing-box format -w -c 待应用 JSON
+执行 sing-box check -c 待应用 JSON
+停止 sing-box，并确认已经停止
+卸载 /usr/bin/sing-box-disable-dns-hijack（已不存在则跳过）
 停止 MosDNS
+确认 MosDNS 已经停止
+清理 dnsmasq 指向 MosDNS 的上游设置
 备份旧配置
-应用原始 JSON
-重启 sing-box
-再次停止 MosDNS
+应用待应用 JSON
+启动 sing-box
+清理导入/处理中间文件
 
 sing-box + mosdns 模式：
 导入本地 JSON 或下载远程 JSON
 生成 MosDNS 模式待应用 JSON
 修改 dns.servers / dns.final 指向 127.0.0.1:5335
 移除 route.rules 中的 hijack-dns，避免 DNS 循环
+执行 sing-box format -w -c 处理后的 JSON
 执行 sing-box check -c 处理后的 JSON
-安装 /usr/bin/sing-box-disable-dns-hijack
-重启 MosDNS
+停止 sing-box，并确认已经停止
+安装 /usr/bin/sing-box-disable-dns-hijack（已安装则跳过）
+启用 MosDNS 联动设置
 备份旧配置
 应用处理后的 JSON
-重启 sing-box
+启动 MosDNS，等待 3 秒并确认运行
+启动 sing-box
 执行 DNS DNAT 清理脚本
 清理导入/处理中间文件
 ```

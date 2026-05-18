@@ -52,6 +52,8 @@ log_result() {
 }
 
 install_dns_hijack_script() {
+	[ -f "$DNS_HIJACK_BIN" ] && return 0
+
 	[ -f "$DNS_HIJACK_TEMPLATE" ] || {
 		log_result "missing DNS hijack cleanup template"
 		exit 1
@@ -62,6 +64,7 @@ install_dns_hijack_script() {
 }
 
 uninstall_dns_hijack_script() {
+	[ -f "$DNS_HIJACK_BIN" ] || return 0
 	rm -f "$DNS_HIJACK_BIN"
 }
 
@@ -75,6 +78,11 @@ stop_mosdns() {
 	uci -q set mosdns.config.enabled='0'
 	uci -q commit mosdns
 	[ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns stop >/dev/null 2>&1 || true
+	sleep 1
+	if [ -x /etc/init.d/mosdns ] && /etc/init.d/mosdns status 2>/dev/null | grep -qi running; then
+		log_result "mosdns still running after stop"
+		exit 1
+	fi
 }
 
 cleanup_dnsmasq_mosdns_upstream() {
@@ -111,6 +119,59 @@ restart_singbox() {
 	sleep 2
 	/etc/init.d/sing-box status >/dev/null 2>&1 || {
 		log_result "sing-box restart failed"
+		exit 1
+	}
+}
+
+stop_singbox_for_apply() {
+	[ -x /etc/init.d/sing-box ] || {
+		log_result "sing-box init script not found"
+		exit 1
+	}
+	/etc/init.d/sing-box stop >/dev/null 2>&1 || {
+		log_result "sing-box stop failed"
+		exit 1
+	}
+	sleep 1
+	if /etc/init.d/sing-box status 2>/dev/null | grep -qi running; then
+		log_result "sing-box still running after stop"
+		exit 1
+	fi
+}
+
+start_singbox_for_apply() {
+	[ -x /etc/init.d/sing-box ] || {
+		log_result "sing-box init script not found"
+		exit 1
+	}
+	/etc/init.d/sing-box start
+	sleep 2
+	/etc/init.d/sing-box status >/dev/null 2>&1 || {
+		log_result "sing-box start failed"
+		exit 1
+	}
+}
+
+start_mosdns_for_apply() {
+	[ -x /etc/init.d/mosdns ] || {
+		log_result "mosdns init script not found"
+		exit 1
+	}
+	uci -q set mosdns.config.enabled='1'
+	uci -q set mosdns.config.redirect='1'
+	uci -q set mosdns.config.local_dns_redirect='0'
+	uci -q commit mosdns
+	/etc/init.d/mosdns restart
+	sleep 3
+	/etc/init.d/mosdns status >/dev/null 2>&1 || {
+		log_result "mosdns start failed"
+		exit 1
+	}
+}
+
+format_config() {
+	/usr/bin/sing-box format -w -c "$1" >>/tmp/singboxlite-prepare.log 2>&1 || {
+		log_result "config format failed"
 		exit 1
 	}
 }
@@ -170,6 +231,8 @@ else
 	APPLY_FILE="$SINGBOX_FILE"
 fi
 
+format_config "$APPLY_FILE"
+
 /usr/bin/sing-box check -c "$APPLY_FILE" >/tmp/singboxlite-check.log 2>&1 || {
 	log_result "config check failed"
 	exit 1
@@ -187,6 +250,8 @@ uci -q commit singboxlite
 	log_result "downloaded and checked, auto apply disabled"
 	exit 0
 }
+
+stop_singbox_for_apply
 
 if [ "$MODE" = "singbox_mosdns" ]; then
 	if [ "$DISABLE_DNS_HIJACK" = "1" ]; then
@@ -210,8 +275,8 @@ if [ -f "$CONFIG_PATH" ]; then
 fi
 
 cp "$APPLY_FILE" "$CONFIG_PATH"
-[ "$MODE" = "singbox_mosdns" ] && [ "$RESTART_MOSDNS_AFTER_APPLY" = "1" ] && restart_mosdns
-restart_singbox
+[ "$MODE" = "singbox_mosdns" ] && start_mosdns_for_apply
+start_singbox_for_apply
 [ "$MODE" = "singbox_mosdns" ] && [ "$DISABLE_DNS_HIJACK" = "1" ] && run_dns_hijack_script
 rm -f "$TEMP_FILE" "$MOSDNS_FILE" "$SINGBOX_FILE"
 
