@@ -2,7 +2,6 @@
 
 # Remove only sing-box auto_redirect DNS DNAT rules.
 # Keep OpenWrt fw4 DNS redirect rules intact, so LAN DNS still goes to dnsmasq.
-
 for _ in 1 2 3 4 5; do
 	nft -a list table inet sing-box 2>/dev/null | awk '
 		/^[[:space:]]*chain[[:space:]]+/ { chain=$2 }
