@@ -169,6 +169,36 @@ start_mosdns_for_apply() {
 	}
 }
 
+dns_lookup_probe() {
+	TARGET="$1"
+	LABEL="$2"
+	nslookup github.com "$TARGET" >/tmp/singboxlite-dns-probe.log 2>&1 && grep -q "Address" /tmp/singboxlite-dns-probe.log || {
+		log_result "$LABEL DNS probe failed"
+		return 1
+	}
+}
+
+dns_probe_after_apply() {
+	if [ "$MODE" = "singbox_mosdns" ]; then
+		dns_lookup_probe "127.0.0.1:${MOSDNS_PORT}" "mosdns" || return 1
+		dns_lookup_probe "127.0.0.1" "local dns" || return 1
+	else
+		dns_lookup_probe "127.0.0.1" "sing-box" || return 1
+	fi
+}
+
+rollback_after_failed_apply() {
+	[ -n "${BACKUP:-}" ] && [ -f "$BACKUP" ] && cp -p "$BACKUP" "$CONFIG_PATH" || true
+	uci -q set singboxlite.main.mode='singbox_dns'
+	uci -q commit singboxlite
+	uninstall_dns_hijack_script
+	stop_mosdns
+	cleanup_dnsmasq_mosdns_upstream
+	start_singbox_for_apply
+	log_result "DNS probe failed, rolled back to sing-box mode"
+	exit 1
+}
+
 format_config() {
 	/usr/bin/sing-box format -w -c "$1" >>/tmp/singboxlite-prepare.log 2>&1 || {
 		log_result "config format failed"
@@ -278,6 +308,7 @@ cp "$APPLY_FILE" "$CONFIG_PATH"
 [ "$MODE" = "singbox_mosdns" ] && start_mosdns_for_apply
 start_singbox_for_apply
 [ "$MODE" = "singbox_mosdns" ] && [ "$DISABLE_DNS_HIJACK" = "1" ] && run_dns_hijack_script
+dns_probe_after_apply || rollback_after_failed_apply
 rm -f "$TEMP_FILE" "$MOSDNS_FILE" "$SINGBOX_FILE"
 
 uci -q set singboxlite.main.last_apply_time="$(date '+%Y-%m-%d %H:%M:%S')"

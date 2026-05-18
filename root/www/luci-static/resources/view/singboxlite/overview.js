@@ -31,6 +31,12 @@ function notify(title, res) {
 	]), res.ok ? 'info' : 'error');
 }
 
+function reloadAfterApply(res) {
+	if (res && (res.ok || res.rollback))
+		window.setTimeout(function() { location.reload(); }, 1200);
+	return res;
+}
+
 function val(id) {
 	var el = document.getElementById(id);
 	return el ? el.value : '';
@@ -121,7 +127,7 @@ function saveSettings(message, applyCron, applyNow) {
 		mosdns_addr: val('sbl-mosdns-addr') || '127.0.0.1',
 		mosdns_port: val('sbl-mosdns-port') || '5335',
 		disable_dns_hijack: yes('sbl-disable-dns-hijack'),
-			restart_mosdns: true,
+		restart_mosdns: true,
 		clean_log: yes('sbl-clean-log'),
 		tail_lines: val('sbl-tail-lines') || '200'
 	}).then(function() {
@@ -141,6 +147,7 @@ function saveAndApplyAll() {
 		return callApplyCurrent();
 	}).then(function(res) {
 		notify('保存并应用', res);
+		return reloadAfterApply(res);
 	}).catch(function(e) {
 		if (e)
 			L.error(e);
@@ -308,7 +315,7 @@ return view.extend({
 										return callCheckImported('local').then(function(res) { notify('本地配置检查', res); });
 									}).catch(function(e) { ui.addNotification(null, E('p', e.message), 'error'); });
 								} }, '↑ 上传并检查'),
-								E('button', { 'class': 'sbl-btn', 'click': function() { return callApplyImported('local').then(function(res) { notify('应用本地配置', res); }); } }, '✓ 应用本地配置')
+								E('button', { 'class': 'sbl-btn', 'click': function() { return callApplyImported('local').then(function(res) { notify('应用本地配置', res); return reloadAfterApply(res); }); } }, '✓ 应用本地配置')
 							]),
 							importBox('远程 URL 配置', '读取右侧填写的 URL；保存当前输入后拉取、检查并生成待应用文件。', '待检查', 'warn', [
 								E('button', { 'class': 'sbl-btn primary', 'click': function() {
@@ -322,7 +329,7 @@ return view.extend({
 									}).then(function(res) {
 										return stopIfFailed('远程配置检查', res);
 									}).then(function() {
-										return callApplyImported('remote').then(function(res) { notify('应用远程配置', res); });
+										return callApplyImported('remote').then(function(res) { notify('应用远程配置', res); return reloadAfterApply(res); });
 									}).catch(function(e) {
 										if (e)
 											L.error(e);

@@ -358,6 +358,60 @@ function cleanup_dnsmasq_mosdns_upstream() {
 	return { ok: res.code === 0, output: res.stdout || '已清理 dnsmasq MosDNS 上游并重启 dnsmasq' };
 }
 
+function dns_lookup_probe(target, label) {
+	let res = exec_cmd('nslookup github.com ' + shellquote(target));
+	if (res.code === 0 && match(res.stdout, /Address/))
+		return { ok: true, output: label + ' DNS 探测通过', target: target, detail: res.stdout };
+
+	return { ok: false, output: label + ' DNS 探测失败：github.com 无法解析\n' + (res.stdout || ''), target: target };
+}
+
+function dns_probe_for_apply(mode) {
+	if (mode == 'singbox_mosdns') {
+		let mosdns = dns_lookup_probe('127.0.0.1:' + mosdns_port(), 'MosDNS');
+		if (!mosdns.ok)
+			return mosdns;
+
+		let system_dns = dns_lookup_probe('127.0.0.1', '本机入口');
+		if (!system_dns.ok)
+			return system_dns;
+
+		return {
+			ok: true,
+			output: 'DNS 探测通过：MosDNS 与本机 DNS 入口均可解析 github.com',
+			mosdns: mosdns,
+			system_dns: system_dns
+		};
+	}
+
+	return dns_lookup_probe('127.0.0.1', 'sing-box');
+}
+
+function rollback_after_failed_apply(backup, failed) {
+	let dest = config_path();
+	let restored = { ok: true, skipped: true };
+
+	if (backup && stat(backup)?.type == 'file') {
+		let res = exec_cmd('cp -p ' + shellquote(backup) + ' ' + shellquote(dest));
+		restored = { ok: res.code === 0, output: res.stdout || '已恢复旧 sing-box 配置', backup: backup };
+	}
+
+	set_cfg('main', 'mode', 'singbox_dns');
+	uninstall_dns_hijack_script();
+	let mosdns = stop_mosdns_internal();
+	let dnsmasq = cleanup_dnsmasq_mosdns_upstream();
+	let singbox = start_singbox_internal();
+
+	return {
+		ok: false,
+		output: trim_text((failed?.output || '应用后 DNS 探测失败') + '\n已回滚到 sing-box 模式，避免继续断网。'),
+		restored: restored,
+		mosdns: mosdns,
+		dnsmasq: dnsmasq,
+		singbox: singbox
+	};
+}
+
 function install_dns_hijack_script() {
 	if (stat(DNS_HIJACK_BIN)?.type == 'file')
 		return { ok: true, skipped: true, output: 'DNS DNAT 清理脚本已安装' };
@@ -552,6 +606,12 @@ function apply_config(path, source) {
 	if (!dns_hijack_cleanup.ok)
 		return { ok: false, step: 'dns_hijack_cleanup', output: dns_hijack_cleanup.output, backup: backup.backup };
 
+	let dns_probe = restarted.ok ? dns_probe_for_apply(mode) : { ok: false, output: restarted.output || 'sing-box 未启动，跳过 DNS 探测' };
+	if (!dns_probe.ok) {
+		let rollback = rollback_after_failed_apply(backup.backup, dns_probe);
+		return { ok: false, step: 'dns_probe', output: rollback.output, backup: backup.backup, mode: 'singbox_dns', dns_probe: dns_probe, rollback: rollback };
+	}
+
 	let cleanup = restarted.ok ? cleanup_stage_files() : { ok: true, skipped: true };
 
 	set_cfg('main', 'last_apply_time', now_string());
@@ -572,6 +632,7 @@ function apply_config(path, source) {
 		mosdns_after: mosdns_after,
 		stopped: stopped,
 		dns_hijack_cleanup: dns_hijack_cleanup,
+		dns_probe: dns_probe,
 		stage_cleanup: cleanup
 	};
 }
