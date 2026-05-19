@@ -20,7 +20,8 @@ https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbo
 
 ```sh
 cd /tmp
-wget -O luci-app-singbox-lite.apk https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite.apk
+URL="https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite.apk"
+curl -fL -o luci-app-singbox-lite.apk "$URL" || wget -O luci-app-singbox-lite.apk "$URL"
 apk add --allow-untrusted /tmp/luci-app-singbox-lite.apk
 rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
 /etc/init.d/rpcd restart
