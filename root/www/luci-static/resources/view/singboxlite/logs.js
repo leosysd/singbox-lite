@@ -86,6 +86,14 @@ function statCard(label, value, meta, tone, idValue, idMeta) {
 	]);
 }
 
+function pageTabs(active) {
+	return E('div', { 'class': 'sbll-panel sbll-tabs' }, [
+		E('button', { 'class': 'sbll-tab ' + (active === 'overview' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/overview'); } }, '总览'),
+		E('button', { 'class': 'sbll-tab ' + (active === 'ruleset' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/ruleset'); } }, '规则集'),
+		E('button', { 'class': 'sbll-tab ' + (active === 'logs' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '日志')
+	]);
+}
+
 function selectLines(current) {
 	var values = [ '100', '200', '300', '500' ];
 	return E('select', { 'class': 'sbll-input', id: 'sbll-lines', 'change': function() {
@@ -262,9 +270,13 @@ function saveLogSettings(message, writeCron) {
 
 function css() {
 	return E('style', {}, `
+		#maincontent>.cbi-tabmenu,#maincontent>.tabs{display:none!important}
 		.sbll-page{color:#0f1f35;font-size:12px}
 		.sbll-panel{background:#fff;border:1px solid #d5deeb;border-radius:7px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
 		.sbll-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin-bottom:10px}
+		.sbll-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
+		.sbll-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sbll-tab.active{color:#2563eb;border-bottom-color:#2563eb}
 		.sbll-title h2{margin:0 0 4px;font-size:18px;line-height:1.1;color:#102038}
 		.sbll-title p{margin:0;color:#5f7088;font-size:12px;line-height:1.3}
 		.sbll-actions,.sbll-toolbar,.sbll-sources,.sbll-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
@@ -348,6 +360,7 @@ return view.extend({
 					E('button', { 'class': 'sbll-btn danger', 'click': cleanCurrentLog }, '× 清理当前日志')
 				])
 			]),
+			pageTabs('logs'),
 			E('div', { 'class': 'sbll-stats' }, [
 					statCard('当前来源', 'Sing-box 日志', sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
 					statCard('日志大小', formatBytes(initial.size || 0), activeSource === 'singbox' ? '来自系统日志 logread' : '建议清理或启用轮转', (initial.size || 0) > 1024 * 1024 ? 'danger' : ''),

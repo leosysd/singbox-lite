@@ -199,8 +199,17 @@ function overviewItem(label, value) {
 	]);
 }
 
+function pageTabs(active) {
+	return E('div', { 'class': 'sbl-panel sbl-tabs' }, [
+		E('button', { 'class': 'sbl-tab ' + (active === 'overview' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/overview'); } }, '总览'),
+		E('button', { 'class': 'sbl-tab ' + (active === 'ruleset' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/ruleset'); } }, '规则集'),
+		E('button', { 'class': 'sbl-tab ' + (active === 'logs' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '日志')
+	]);
+}
+
 function css() {
 	return E('style', {}, `
+		#maincontent>.cbi-tabmenu,#maincontent>.tabs{display:none!important}
 		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
 		.sbl-shell{max-width:1440px;margin:0 auto}
 		.sbl-panel{background:rgba(255,255,255,.97);border:1px solid #d8e4f5;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
@@ -223,6 +232,9 @@ function css() {
 		.sbl-hero-metric{min-height:40px;border-radius:12px;background:rgba(255,255,255,.15);padding:7px 12px;box-sizing:border-box;overflow:hidden}
 		.sbl-hero-metric span{display:block;font-size:10px;color:rgba(255,255,255,.72);margin-bottom:3px}
 		.sbl-hero-metric b{display:block;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbl-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
+		.sbl-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sbl-tab.active{color:#2563eb;border-bottom-color:#2563eb}
 		.sbl-status-strip{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0;background:rgba(255,255,255,.98);border:1px solid #d8e4f5;border-radius:14px;padding:10px 14px;box-shadow:0 14px 34px rgba(64,91,160,.09)}
 		.sbl-crumb{color:#60728e;font-weight:800}
 		.sbl-enabled{display:inline-flex;align-items:center;border-radius:999px;background:#e8fbf0;color:#07905f;border:1px solid #bceacf;padding:6px 12px;font-weight:900;white-space:nowrap}
@@ -331,6 +343,7 @@ return view.extend({
 						heroMetric('DNS / 规则', activeMode === 'singbox_mosdns' ? 'MosDNS 联动' : 'sing-box 接管')
 					])
 				]),
+				pageTabs('overview'),
 				E('div', { 'class': 'sbl-status-strip' }, [
 					E('div', { 'class': 'sbl-crumb' }, '当前页面：总览 · 保存并应用会拉取远程配置并检查后写入'),
 					E('span', { 'class': 'sbl-enabled' }, status.singbox_running ? '已启用' : '未运行')

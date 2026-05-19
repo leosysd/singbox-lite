@@ -127,6 +127,14 @@ function statCard(label, value, meta, tone) {
 	]);
 }
 
+function pageTabs(active) {
+	return E('div', { 'class': 'sblr-panel sblr-tabs' }, [
+		E('button', { 'class': 'sblr-tab ' + (active === 'overview' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/overview'); } }, '总览'),
+		E('button', { 'class': 'sblr-tab ' + (active === 'ruleset' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/ruleset'); } }, '规则集'),
+		E('button', { 'class': 'sblr-tab ' + (active === 'logs' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '日志')
+	]);
+}
+
 function ruleCard(file, state) {
 	return E('div', { 'class': 'sblr-rule' }, [
 		E('span', { 'class': 'sblr-dot ' + (state.exists ? 'ok' : 'warn') }),
@@ -165,9 +173,13 @@ function saveRuleset(message, writeCron, applyNow) {
 
 function css() {
 	return E('style', {}, `
+		#maincontent>.cbi-tabmenu,#maincontent>.tabs{display:none!important}
 		.sblr-page{color:#0f1f35;font-size:12px}
 		.sblr-panel{background:#fff;border:1px solid #d5deeb;border-radius:7px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
 		.sblr-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin-bottom:10px}
+		.sblr-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
+		.sblr-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sblr-tab.active{color:#2563eb;border-bottom-color:#2563eb}
 		.sblr-title h2{margin:0 0 4px;font-size:18px;line-height:1.1;color:#102038}
 		.sblr-title p{margin:0;color:#5f7088;font-size:12px;line-height:1.3}
 		.sblr-actions,.sblr-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
@@ -274,6 +286,7 @@ return view.extend({
 					} }, '× 清理日志')
 				])
 			]),
+			pageTabs('ruleset'),
 			E('div', { 'class': 'sblr-stats' }, [
 				statCard('更新状态', status.ruleset_last_update_result || '-', status.ruleset_last_update_time || '-', status.ruleset_last_update_result === 'pass' ? 'ok' : 'warn'),
 				statCard('sing-box 目录', singboxDir, '输出 .srs / .json'),
