@@ -209,7 +209,7 @@ function pageTabs(active) {
 
 function css() {
 	return E('style', {}, `
-		#maincontent>.cbi-tabmenu,#maincontent>.tabs{display:none!important}
+		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
 		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
 		.sbl-shell{max-width:1440px;margin:0 auto}
 		.sbl-panel{background:rgba(255,255,255,.97);border:1px solid #d8e4f5;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}

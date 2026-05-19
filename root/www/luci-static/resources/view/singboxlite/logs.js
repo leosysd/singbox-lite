@@ -270,18 +270,21 @@ function saveLogSettings(message, writeCron) {
 
 function css() {
 	return E('style', {}, `
-		#maincontent>.cbi-tabmenu,#maincontent>.tabs{display:none!important}
-		.sbll-page{color:#0f1f35;font-size:12px}
-		.sbll-panel{background:#fff;border:1px solid #d5deeb;border-radius:7px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
-		.sbll-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin-bottom:10px}
+		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
+		.sbll-page{color:#0f1f35;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
+		.sbll-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
+		.sbll-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;margin-bottom:10px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
+		.sbll-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
+		.sbll-title,.sbll-actions{position:relative;z-index:1}
 		.sbll-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
 		.sbll-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
 		.sbll-tab.active{color:#2563eb;border-bottom-color:#2563eb}
-		.sbll-title h2{margin:0 0 4px;font-size:18px;line-height:1.1;color:#102038}
-		.sbll-title p{margin:0;color:#5f7088;font-size:12px;line-height:1.3}
+		.sbll-title h2{margin:0 0 4px;font-size:18px;line-height:1.1;color:#fff}
+		.sbll-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.3}
 		.sbll-actions,.sbll-toolbar,.sbll-sources,.sbll-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 		.sbll-actions{justify-content:flex-end}
 		.sbll-btn{min-height:28px;border-radius:6px;border:1px solid #b8c7ff;background:#fff;color:#4f62df;padding:0 11px;font-size:12px;font-weight:800;cursor:pointer}
+		.sbll-hero .sbll-btn:not(.primary):not(.danger){background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.24);color:#fff}
 		.sbll-btn.primary,.sbll-source.active{background:#5b6ee1;border-color:#5b6ee1;color:#fff}
 		.sbll-btn.danger{background:#f23655;border-color:#f23655;color:#fff}
 		.sbll-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
