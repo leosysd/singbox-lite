@@ -4,8 +4,6 @@
 'require uci';
 'require view';
 
-var LOCAL_TEMP = '/etc/sing-box/singboxlite/import-local.json';
-
 var callStatus = rpc.declare({ object: 'luci.singboxlite', method: 'status', expect: { '': {} } });
 var callCheckCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'check_current', expect: { '': {} } });
 var callBackup = rpc.declare({ object: 'luci.singboxlite', method: 'backup_current', expect: { '': {} } });
@@ -15,8 +13,6 @@ var callStopSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'stop_si
 var callRestartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'restart_singbox', expect: { '': {} } });
 var callRestartMosdns = rpc.declare({ object: 'luci.singboxlite', method: 'restart_mosdns', expect: { '': {} } });
 var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_remote', params: [ 'url' ], expect: { '': {} } });
-var callCheckImported = rpc.declare({ object: 'luci.singboxlite', method: 'check_imported', params: [ 'source' ], expect: { '': {} } });
-var callApplyImported = rpc.declare({ object: 'luci.singboxlite', method: 'apply_imported', params: [ 'source' ], expect: { '': {} } });
 var callApplyCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'apply_current', expect: { '': {} } });
 var callSaveOverviewSettings = rpc.declare({ object: 'luci.singboxlite', method: 'save_overview_settings', params: [ 'settings' ], expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
@@ -153,6 +149,11 @@ function saveSettings(message, applyCron, applyNow) {
 
 function saveAndApplyAll() {
 	return saveSettings('已保存设置，开始应用', true, true).then(function() {
+		if (val('sbl-remote-url') !== '')
+			return callFetchRemote(val('sbl-remote-url')).then(function(res) {
+				return stopIfFailed('远程配置预检', res);
+			});
+	}).then(function() {
 		return callApplyCurrent();
 	}).then(function(res) {
 		notify('保存并应用', res);
@@ -173,20 +174,6 @@ function statCard(label, value, meta, tone) {
 		E('div', { 'class': 'sbl-stat-label' }, label),
 		E('div', { 'class': 'sbl-stat-value ' + (tone || '') }, value || '-'),
 		E('div', { 'class': 'sbl-stat-meta' }, meta || '-')
-	]);
-}
-
-function importBox(title, text, chip, chipTone, buttons) {
-	return E('div', { 'class': 'sbl-import-box' }, [
-		E('div', {}, [
-			E('h3', {}, title),
-			E('p', {}, text),
-			E('div', { 'class': 'sbl-chip-row' }, [
-				E('span', { 'class': 'sbl-chip ' + (chipTone || '') }, chip),
-				E('span', { 'class': 'sbl-muted' }, title.indexOf('本地') >= 0 ? LOCAL_TEMP : '上次更新 -')
-			])
-		]),
-		E('div', { 'class': 'sbl-card-actions' }, buttons)
 	]);
 }
 
@@ -212,11 +199,7 @@ function css() {
 		.sbl-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:10px;align-items:start}
 		.sbl-card{padding:12px 13px;margin-bottom:10px}
 		.sbl-card>h3,.sbl-subtitle{margin:0 0 10px;font-size:13px;color:#102038}
-		.sbl-import-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-		.sbl-import-box{border:1px solid #dbe3ef;border-radius:7px;background:#fbfcff;padding:12px;min-height:132px;display:flex;flex-direction:column;justify-content:space-between}
-		.sbl-import-box h3{margin:0 0 8px;font-size:14px}
-		.sbl-import-box p{margin:0 0 8px;line-height:1.35;color:#5f7088;font-size:12px}
-		.sbl-chip-row{display:flex;align-items:center;gap:8px}
+			.sbl-chip-row{display:flex;align-items:center;gap:8px}
 		.sbl-chip{display:inline-flex;align-items:center;min-height:21px;border-radius:999px;padding:0 9px;font-size:11px;font-weight:900;background:#eafaf2;color:#008763}
 		.sbl-chip.warn{background:#fff4cf;color:#b76b05}
 		.sbl-muted{color:#7a8ba3;font-size:11px}
@@ -247,7 +230,7 @@ function css() {
 			.sbl-flow-row b{display:block;color:#102038;margin-bottom:2px}.sbl-flow-row span:last-child{font-size:11px}
 			.sbl-step{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:#eef2ff;color:#4f62df;font-weight:900}
 			.sbl-footer{justify-content:flex-end;margin-top:2px}
-			@media(max-width:1100px){.sbl-grid,.sbl-settings,.sbl-import-grid,.sbl-stats{grid-template-columns:1fr}.sbl-hero{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:120px minmax(0,1fr)}}
+				@media(max-width:1100px){.sbl-grid,.sbl-settings,.sbl-stats{grid-template-columns:1fr}.sbl-hero{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:120px minmax(0,1fr)}}
 		`);
 }
 
@@ -291,8 +274,8 @@ return view.extend({
 			css(),
 			E('div', { 'class': 'sbl-panel sbl-hero' }, [
 				E('div', { 'class': 'sbl-title' }, [
-					E('h2', {}, 'SingBox Lite'),
-					E('p', {}, '导入 sing-box 原生 JSON，检查通过后应用；当前模式会自动处理 MosDNS 联动。')
+						E('h2', {}, 'SingBox Lite'),
+						E('p', {}, '保存并应用时会自动拉取远程 JSON，检查通过后应用；当前模式会自动处理 MosDNS 联动。')
 				]),
 				E('div', { 'class': 'sbl-actions' }, [
 					E('button', { 'class': 'sbl-btn', 'click': function() { return callCheckCurrent().then(function(res) { notify('检查配置', res); }); } }, '✓ 检查配置'),
@@ -323,41 +306,9 @@ return view.extend({
 					statCard('模式', modeText(mode), selectedModeMeta, mode === activeMode ? 'ok' : 'warn')
 				]),
 			E('div', { 'class': 'sbl-grid' }, [
-				E('div', {}, [
-					E('div', { 'class': 'sbl-panel sbl-card' }, [
-						E('h3', {}, '配置导入'),
-						E('div', { 'class': 'sbl-import-grid' }, [
-							importBox('本地 JSON 配置', '上传到临时路径后先执行 sing-box check，通过后再覆盖正式配置。', '可导入', '', [
-								E('button', { 'class': 'sbl-btn primary', 'click': function(ev) {
-									return ui.uploadFile(LOCAL_TEMP, ev.target).then(function() {
-										return callCheckImported('local').then(function(res) { notify('本地配置检查', res); });
-									}).catch(function(e) { ui.addNotification(null, E('p', e.message), 'error'); });
-								} }, '↑ 上传并检查'),
-								E('button', { 'class': 'sbl-btn', 'click': function() { return callApplyImported('local').then(function(res) { notify('应用本地配置', res); return reloadAfterApply(res); }); } }, '✓ 应用本地配置')
-							]),
-							importBox('远程 URL 配置', '读取右侧填写的 URL；保存当前输入后拉取、检查并生成待应用文件。', '待检查', 'warn', [
-								E('button', { 'class': 'sbl-btn primary', 'click': function() {
-									return saveSettings('已保存远程 URL', false, true).then(function() {
-										return callFetchRemote(val('sbl-remote-url')).then(function(res) { notify('远程配置检查', res); });
-									});
-								} }, '↓ 拉取并检查'),
-								E('button', { 'class': 'sbl-btn', 'click': function() {
-									return saveSettings('已保存远程设置', false, true).then(function() {
-										return callFetchRemote(val('sbl-remote-url'));
-									}).then(function(res) {
-										return stopIfFailed('远程配置检查', res);
-									}).then(function() {
-										return callApplyImported('remote').then(function(res) { notify('应用远程配置', res); return reloadAfterApply(res); });
-									}).catch(function(e) {
-										if (e)
-											L.error(e);
-									});
-								} }, '✓ 拉取并应用')
-							])
-						])
-					]),
-					E('div', { 'class': 'sbl-panel sbl-card' }, [
-						E('h3', {}, '运行概况'),
+					E('div', {}, [
+						E('div', { 'class': 'sbl-panel sbl-card' }, [
+							E('h3', {}, '运行概况'),
 						E('div', { 'class': 'sbl-meta-list' }, [
 							E('div', { 'class': 'sbl-meta' }, [ E('span', {}, 'sing-box 版本'), E('b', {}, (status.singbox_version || '-').replace(/^sing-box version /, '')) ]),
 							E('div', { 'class': 'sbl-meta' }, [ E('span', {}, 'PID'), E('b', {}, status.singbox_pid || '-') ]),
@@ -404,12 +355,12 @@ return view.extend({
 							E('h3', {}, '应用流程'),
 							E('div', { 'class': 'sbl-flow' }, [
 								E('div', {}, [
-									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '1'), E('div', {}, [ E('b', {}, '准备配置'), E('span', {}, '按当前模式处理导入 JSON') ]), E('span', {}, 'prepare') ]),
-									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '3'), E('div', {}, [ E('b', {}, '备份旧配置'), E('span', {}, '失败时可恢复到 sing-box 模式') ]), E('span', {}, 'backup') ]),
-									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '5'), E('div', {}, [ E('b', {}, '启动相关服务'), E('span', {}, 'MosDNS 模式先等 10 秒再启动 sing-box') ]), E('span', {}, 'restart') ])
-								]),
-								E('div', {}, [
-									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '2'), E('div', {}, [ E('b', {}, '检查配置'), E('span', {}, 'sing-box check 通过才继续') ]), E('span', {}, 'check') ]),
+										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '1'), E('div', {}, [ E('b', {}, '拉取远程配置'), E('span', {}, '保存并应用时自动下载 URL') ]), E('span', {}, 'fetch') ]),
+										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '3'), E('div', {}, [ E('b', {}, '临时回滚备份'), E('span', {}, '失败回滚，成功后自动删除') ]), E('span', {}, 'backup') ]),
+										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '5'), E('div', {}, [ E('b', {}, '启动相关服务'), E('span', {}, 'MosDNS 模式先等 10 秒再启动 sing-box') ]), E('span', {}, 'restart') ])
+									]),
+									E('div', {}, [
+										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '2'), E('div', {}, [ E('b', {}, '预检配置'), E('span', {}, 'JSON 有效并通过 sing-box check') ]), E('span', {}, 'check') ]),
 									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '4'), E('div', {}, [ E('b', {}, '写入正式配置'), E('span', {}, '同时处理 MosDNS/dnsmasq 联动') ]), E('span', {}, 'apply') ]),
 									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '6'), E('div', {}, [ E('b', {}, 'DNS 探测'), E('span', {}, '失败会自动回滚，避免保持断网状态') ]), E('span', {}, 'probe') ])
 								])

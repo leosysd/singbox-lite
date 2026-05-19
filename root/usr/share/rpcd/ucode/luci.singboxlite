@@ -15,6 +15,7 @@ const REMOTE_TEMP = '/etc/sing-box/singboxlite/import-remote.json';
 const MOSDNS_TEMP = '/etc/sing-box/singboxlite/import-mosdns.json';
 const SINGBOX_TEMP = '/etc/sing-box/singboxlite/import-singbox.json';
 const SOURCE_CONFIG = '/etc/sing-box/singboxlite/source.json';
+const ROLLBACK_BACKUP = '/etc/sing-box/singboxlite/rollback-config.json';
 const OLD_SOURCE_CONFIG = '/etc/sing-box/singboxlite-source.json';
 const OLD_LOCAL_TEMP = '/tmp/singboxlite/import-local.json';
 const OLD_REMOTE_TEMP = '/tmp/singboxlite/import-remote.json';
@@ -219,6 +220,21 @@ function backup_current() {
 	let backup = current + '.bak-singboxlite';
 	let res = exec_cmd('rm -f ' + shellquote(current + '.bak-singboxlite-') + '* 2>/dev/null || true; cp -p ' + shellquote(current) + ' ' + shellquote(backup));
 	return { ok: res.code === 0, output: res.stdout, backup: backup };
+}
+
+function backup_for_apply() {
+	let current = config_path();
+	if (stat(current)?.type != 'file')
+		return { ok: true, skipped: true, output: '当前配置不存在，跳过回滚备份：' + current, backup: '' };
+
+	ensure_temp_dir();
+	let res = exec_cmd('cp -p ' + shellquote(current) + ' ' + shellquote(ROLLBACK_BACKUP));
+	return { ok: res.code === 0, output: res.stdout || '已创建临时回滚备份', backup: ROLLBACK_BACKUP };
+}
+
+function cleanup_apply_backup() {
+	let res = exec_cmd('rm -f ' + shellquote(ROLLBACK_BACKUP));
+	return { ok: res.code === 0, output: res.stdout || '已清理临时回滚备份' };
 }
 
 function restart_singbox_internal() {
@@ -533,12 +549,8 @@ function current_source_path() {
 		return OLD_SOURCE_CONFIG;
 	if (stat(REMOTE_TEMP)?.type == 'file')
 		return REMOTE_TEMP;
-	if (stat(LOCAL_TEMP)?.type == 'file')
-		return LOCAL_TEMP;
 	if (stat(OLD_REMOTE_TEMP)?.type == 'file')
 		return OLD_REMOTE_TEMP;
-	if (stat(OLD_LOCAL_TEMP)?.type == 'file')
-		return OLD_LOCAL_TEMP;
 
 	return config_path();
 }
@@ -578,7 +590,7 @@ function apply_config(path, source) {
 	if (!source_store.ok)
 		return { ok: false, step: 'source_store', output: source_store.output };
 
-	backup = backup_current();
+	backup = backup_for_apply();
 	if (!backup.ok)
 		return { ok: false, step: 'backup', output: backup.output };
 
@@ -631,6 +643,7 @@ function apply_config(path, source) {
 	}
 
 	let cleanup = restarted.ok ? cleanup_stage_files() : { ok: true, skipped: true };
+	let backup_cleanup = restarted.ok ? cleanup_apply_backup() : { ok: true, skipped: true };
 
 	set_cfg('main', 'last_apply_time', now_string());
 	set_cfg('main', 'last_import_source', source || '');
@@ -651,7 +664,8 @@ function apply_config(path, source) {
 		stopped: stopped,
 		dns_hijack_cleanup: dns_hijack_cleanup,
 		dns_probe: dns_probe,
-		stage_cleanup: cleanup
+		stage_cleanup: cleanup,
+		backup_cleanup: backup_cleanup
 	};
 }
 
@@ -692,8 +706,29 @@ function fetch_remote(url) {
 		return { ok: false, output: '未找到 uclient-fetch、wget 或 curl' };
 
 	let res = exec_cmd(cmd);
-	if (res.code !== 0)
+	if (res.code !== 0) {
+		set_cfg('remote', 'last_update_result', 'fail');
 		return { ok: false, output: res.stdout };
+	}
+
+	let content = readfile(path) || '';
+	if (length(content) < 20) {
+		set_cfg('remote', 'last_update_result', 'fail');
+		return { ok: false, step: 'download', temp_path: path, output: '远程配置为空或内容异常' };
+	}
+
+	let config = null;
+	try {
+		config = json(content);
+	} catch (e) {
+		set_cfg('remote', 'last_update_result', 'fail');
+		return { ok: false, step: 'json_check', temp_path: path, output: '远程配置不是有效 JSON：' + e };
+	}
+
+	if (type(config) != 'object') {
+		set_cfg('remote', 'last_update_result', 'fail');
+		return { ok: false, step: 'json_check', temp_path: path, output: '远程配置 JSON 顶层必须是对象' };
+	}
 
 	set_cfg('remote', 'url', url);
 	set_cfg('remote', 'last_update_time', now_string());
@@ -703,6 +738,7 @@ function fetch_remote(url) {
 	let checked = check_for_mode(path);
 	set_cfg('main', 'last_check_result', checked.ok ? 'pass' : 'fail');
 	set_cfg('main', 'last_check_time', now_string());
+	set_cfg('remote', 'last_update_result', checked.ok ? 'pass' : 'fail');
 
 	if (checked.ok) {
 		let stored = store_source_config(path, 'remote');
@@ -710,7 +746,15 @@ function fetch_remote(url) {
 			return { ok: false, temp_path: path, output: stored.output };
 	}
 
-	return { ok: checked.ok, temp_path: path, output: checked.output };
+	return {
+		ok: checked.ok,
+		step: checked.ok ? 'remote_check' : 'check',
+		temp_path: path,
+		prepared_path: checked.prepared_path || '',
+		output: checked.ok
+			? '远程配置拉取成功，JSON 有效，sing-box check 通过'
+			: checked.output
+	};
 }
 
 function tail_log(lines, filter) {
