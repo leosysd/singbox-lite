@@ -6,8 +6,6 @@
 
 var callStatus = rpc.declare({ object: 'luci.singboxlite', method: 'status', expect: { '': {} } });
 var callCheckCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'check_current', expect: { '': {} } });
-var callBackup = rpc.declare({ object: 'luci.singboxlite', method: 'backup_current', expect: { '': {} } });
-var callDeleteBackups = rpc.declare({ object: 'luci.singboxlite', method: 'delete_backups', expect: { '': {} } });
 var callStartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'start_singbox', expect: { '': {} } });
 var callStopSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'stop_singbox', expect: { '': {} } });
 var callRestartSingbox = rpc.declare({ object: 'luci.singboxlite', method: 'restart_singbox', expect: { '': {} } });
@@ -16,10 +14,6 @@ var callFetchRemote = rpc.declare({ object: 'luci.singboxlite', method: 'fetch_r
 var callApplyCurrent = rpc.declare({ object: 'luci.singboxlite', method: 'apply_current', expect: { '': {} } });
 var callSaveOverviewSettings = rpc.declare({ object: 'luci.singboxlite', method: 'save_overview_settings', params: [ 'settings' ], expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
-
-function modeText(mode) {
-	return mode === 'singbox_mosdns' ? 'sing-box + mosdns' : 'sing-box';
-}
 
 function notify(title, res) {
 	ui.addNotification(null, E('pre', { 'class': res.ok ? '' : 'errors' }, [
@@ -177,13 +171,6 @@ function statCard(label, value, meta, tone) {
 	]);
 }
 
-function heroMetric(label, value) {
-	return E('div', { 'class': 'sbl-hero-metric' }, [
-		E('span', {}, label),
-		E('b', {}, value || '-')
-	]);
-}
-
 function operationCard(title, body, nodes) {
 	return E('div', { 'class': 'sbl-op-card' }, [
 		E('h3', {}, title),
@@ -199,6 +186,13 @@ function overviewItem(label, value) {
 	]);
 }
 
+function openClashPanel() {
+	var host = window.location.hostname || '10.0.0.1';
+	var protocol = window.location.protocol || 'http:';
+
+	window.open(protocol + '//' + host + ':9090/ui/', '_blank', 'noopener');
+}
+
 function pageTabs(active) {
 	return E('div', { 'class': 'sbl-panel sbl-tabs' }, [
 		E('button', { 'class': 'sbl-tab ' + (active === 'overview' ? 'active' : ''), 'click': function() { location.href = L.url('admin/services/singboxlite/overview'); } }, '总览'),
@@ -210,17 +204,17 @@ function pageTabs(active) {
 function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
-		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
+		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:12px 18px 18px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 62px,#eaf2ff 62px,#f7fbff 100%);min-height:calc(100vh - 110px)}
 		.sbl-shell{max-width:1440px;margin:0 auto}
-		.sbl-panel{background:rgba(255,255,255,.97);border:1px solid #d8e4f5;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
-		.sbl-hero{position:relative;overflow:hidden;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);padding:18px 20px 14px;margin-bottom:12px;color:#fff}
+		.sbl-panel{background:rgba(255,255,255,.97);border:1px solid #d8e4f5;border-radius:10px;box-shadow:0 14px 34px rgba(64,91,160,.10)}
+		.sbl-hero{position:relative;overflow:hidden;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);padding:12px 16px 10px;margin-bottom:8px;color:#fff;min-height:112px;box-sizing:border-box;display:flex;align-items:center}
 		.sbl-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
-		.sbl-hero-top{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
-		.sbl-brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+		.sbl-hero-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%}
+		.sbl-brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 		.sbl-logo{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.18);display:inline-flex;align-items:center;justify-content:center;font-weight:900}
 		.sbl-brand b{display:block;font-size:13px}.sbl-brand span{display:block;font-size:11px;color:rgba(255,255,255,.72)}
-		.sbl-title h2{margin:0 0 7px;font-size:19px;line-height:1.1;color:#fff;font-weight:800}
-		.sbl-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.45;max-width:720px}
+		.sbl-title h2{margin:0 0 5px;font-size:17px;line-height:1.1;color:#fff;font-weight:800}
+		.sbl-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.3;max-width:720px}
 		.sbl-actions,.sbl-card-actions,.sbl-footer,.sbl-op-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 		.sbl-actions{position:relative;z-index:1;justify-content:flex-end}
 		.sbl-btn{min-height:30px;border-radius:10px;border:1px solid #cdddf5;background:#fff;color:#2662d9;padding:0 12px;font-size:12px;font-weight:800;cursor:pointer}
@@ -228,13 +222,9 @@ function css() {
 		.sbl-btn.danger{background:#f04f4f;border-color:#f04f4f;color:#fff}
 		.sbl-btn.soft{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff}
 		.sbl-btn:hover{filter:brightness(.98)}
-		.sbl-hero-metrics{position:relative;z-index:1;display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr;gap:8px;margin-top:14px}
-		.sbl-hero-metric{min-height:40px;border-radius:12px;background:rgba(255,255,255,.15);padding:7px 12px;box-sizing:border-box;overflow:hidden}
-		.sbl-hero-metric span{display:block;font-size:10px;color:rgba(255,255,255,.72);margin-bottom:3px}
-		.sbl-hero-metric b{display:block;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbl-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
-		.sbl-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
-		.sbl-tab.active{color:#2563eb;border-bottom-color:#2563eb}
+		.sbl-tabs{height:40px;display:flex;align-items:center;gap:6px;padding:0 10px;margin:8px 0;border-radius:8px;box-shadow:0 12px 28px rgba(64,91,160,.08)}
+		.sbl-tab{height:28px;display:inline-flex;align-items:center;padding:0 14px;border:0;border-radius:7px;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sbl-tab.active{color:#fff;background:#2563eb;box-shadow:0 6px 14px rgba(37,99,235,.22)}
 		.sbl-status-strip{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0;background:rgba(255,255,255,.98);border:1px solid #d8e4f5;border-radius:14px;padding:10px 14px;box-shadow:0 14px 34px rgba(64,91,160,.09)}
 		.sbl-crumb{color:#60728e;font-weight:800}
 		.sbl-enabled{display:inline-flex;align-items:center;border-radius:999px;background:#e8fbf0;color:#07905f;border:1px solid #bceacf;padding:6px 12px;font-weight:900;white-space:nowrap}
@@ -243,8 +233,8 @@ function css() {
 		.sbl-overview-item span{display:block;color:#65758f;font-weight:800;margin-bottom:6px}
 		.sbl-overview-item b{display:block;color:#132845;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 		.sbl-main{display:grid;gap:12px}
-		.sbl-op-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-		.sbl-op-card{min-height:116px;border:1px solid #d8e4f5;border-radius:14px;background:#fff;padding:15px;box-sizing:border-box}
+		.sbl-op-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+		.sbl-op-card{min-height:112px;border:1px solid #d8e4f5;border-radius:10px;background:#fff;padding:13px;box-sizing:border-box}
 		.sbl-op-card p{margin:0 0 16px;color:#70849f;line-height:1.45;min-height:32px}
 		.sbl-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 		.sbl-card{padding:16px;margin-bottom:12px}
@@ -274,7 +264,7 @@ function css() {
 		.sbl-meta{display:flex;justify-content:space-between;border-bottom:1px solid #e4eaf2;padding:8px 0;gap:12px}
 		.sbl-meta span{color:#5f7088}.sbl-meta b{color:#102038;text-align:right}
 		.sbl-footer{justify-content:flex-end;margin-top:2px}
-		@media(max-width:1280px){.sbl-grid{grid-template-columns:1fr}.sbl-op-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-hero-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-overview-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
+		@media(max-width:1280px){.sbl-grid{grid-template-columns:1fr}.sbl-op-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-overview-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
 		@media(max-width:900px){.sbl-settings,.sbl-meta-list,.sbl-op-grid,.sbl-overview-strip{grid-template-columns:1fr}.sbl-hero-top,.sbl-status-strip{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:104px minmax(0,1fr)}}
 		`);
 }
@@ -290,8 +280,6 @@ return view.extend({
 	render: function(data) {
 		var status = data[1] || {};
 		var mode = uci.get('singboxlite', 'main', 'mode') || 'singbox_mosdns';
-		var configPath = uci.get('singboxlite', 'main', 'config_path') || '/etc/sing-box/config.json';
-		var logPath = uci.get('singboxlite', 'main', 'log_path') || '/etc/sing-box/sing-box.log';
 		var remoteUrl = uci.get('singboxlite', 'remote', 'url') || '';
 		var remoteAuto = uci.get('singboxlite', 'remote', 'auto_update') === '1';
 		var remoteTime = uci.get('singboxlite', 'remote', 'auto_update_time') || '03:00';
@@ -300,20 +288,10 @@ return view.extend({
 		var mosdnsPort = uci.get('singboxlite', 'dns', 'mosdns_port') || '5335';
 		var disableDnsHijack = uci.get('singboxlite', 'dns', 'disable_dns_hijack') !== '0';
 		var restartMosdns = uci.get('singboxlite', 'dns', 'restart_mosdns_after_apply') !== '0';
-		var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
 		var activeMode = status.mode || mode;
-		var dnsTitle = activeMode === 'singbox_mosdns'
-			? 'MosDNS ' + (status.mosdns_addr || mosdnsAddr) + ':' + (status.mosdns_port || mosdnsPort)
-			: 'sing-box 接管';
 		var dnsMeta = activeMode === 'singbox_mosdns'
 			? (status.dns_hijack_script_installed ? 'DNS DNAT 清理脚本已安装' : 'DNS DNAT 清理脚本未安装')
 			: (status.dns_hijack_script_installed ? '清理脚本仍存在' : 'DNS 劫持由 sing-box 处理');
-			var dnsTone = activeMode === 'singbox_mosdns'
-				? (status.mosdns_running ? 'ok' : 'warn')
-				: (status.dns_hijack_script_installed ? 'warn' : 'ok');
-			var selectedModeMeta = mode === activeMode
-				? (activeMode === 'singbox_mosdns' ? '配置与运行状态一致' : '配置与运行状态一致')
-				: '选择未应用，当前仍是 ' + modeText(activeMode);
 
 		return E('div', { 'class': 'sbl-page' }, [
 			css(),
@@ -330,17 +308,9 @@ return view.extend({
 						]),
 						E('div', { 'class': 'sbl-actions' }, [
 							E('button', { 'class': 'sbl-btn soft', 'click': function() { return callCheckCurrent().then(function(res) { notify('检查配置', res); }); } }, '检查配置'),
-							E('button', { 'class': 'sbl-btn soft', 'click': function() { return callBackup().then(function(res) { notify('备份配置', res); }); } }, '备份配置'),
 							E('button', { 'class': 'sbl-btn soft', 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '查看日志'),
 							E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用')
 						])
-					]),
-					E('div', { 'class': 'sbl-hero-metrics' }, [
-						heroMetric('服务状态', status.singbox_running ? '运行中' : (status.singbox_installed ? '未运行' : '未安装')),
-						heroMetric('当前模式', modeText(mode)),
-						heroMetric('配置文件', (status.config_path || configPath).replace(/^.*\//, '')),
-						heroMetric('运行时长', status.singbox_pid ? 'PID ' + status.singbox_pid : '-'),
-						heroMetric('DNS / 规则', activeMode === 'singbox_mosdns' ? 'MosDNS 联动' : 'sing-box 接管')
 					])
 				]),
 				pageTabs('overview'),
@@ -370,20 +340,11 @@ return view.extend({
 						operationCard('MosDNS 联动', dnsMeta, [
 							E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '重启 MosDNS')
 						]),
-						operationCard('备份', '手动备份正式配置，或者清理历史备份。', [
-							E('button', { 'class': 'sbl-btn', 'click': function() { return callBackup().then(function(res) { notify('备份配置', res); }); } }, '备份'),
-							E('button', { 'class': 'sbl-btn danger', 'click': function() {
-								return ui.showModal('确认删除备份', [
-									E('p', {}, '确定要删除 SingBox Lite 创建的配置备份吗？'),
-									E('div', { 'class': 'right' }, [
-										E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
-										E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
-											ui.hideModal();
-											return callDeleteBackups().then(function(res) { notify('删除备份', res); });
-										} }, '删除')
-									])
-								]);
-							} }, '删备份')
+						operationCard('sing-box 更新注意', '更新核心前确认架构和版本，Alpha/Beta 可能不稳定；更新后需要重启 sing-box。', [
+							E('button', { 'class': 'sbl-btn', 'click': function() { return callCheckCurrent().then(function(res) { notify('更新前检查', res); }); } }, '检查配置')
+						]),
+						operationCard('Clash API', '打开 sing-box 的 Clash 控制面板，地址使用当前路由器 IP 与 9090 端口。', [
+							E('button', { 'class': 'sbl-btn primary', 'click': openClashPanel }, '打开面板')
 						])
 					]),
 					E('div', { 'class': 'sbl-grid' }, [

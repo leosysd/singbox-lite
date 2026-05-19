@@ -167,15 +167,15 @@ function saveRuleset(message, writeCron, applyNow) {
 function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
-		.sblr-page{color:#0f1f35;font-size:12px;margin:-12px;padding:34px 18px 18px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 76px,#eaf2ff 76px,#f7fbff 100%);min-height:calc(100vh - 110px)}
+		.sblr-page{color:#0f1f35;font-size:12px;margin:-12px;padding:12px 18px 18px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 62px,#eaf2ff 62px,#f7fbff 100%);min-height:calc(100vh - 110px)}
 		.sblr-shell{max-width:1440px;margin:0 auto}
 		.sblr-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:10px;box-shadow:0 14px 34px rgba(64,91,160,.10)}
-		.sblr-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 10px;margin-bottom:8px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
+		.sblr-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 10px;margin-bottom:8px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff;min-height:112px;box-sizing:border-box}
 		.sblr-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
 		.sblr-title,.sblr-actions{position:relative;z-index:1}
-		.sblr-tabs{height:38px;display:flex;align-items:center;gap:2px;padding:0 10px;margin:8px 0;border-radius:7px;box-shadow:0 12px 28px rgba(64,91,160,.08)}
-		.sblr-tab{height:38px;display:inline-flex;align-items:center;padding:0 14px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
-		.sblr-tab.active{color:#2563eb;border-bottom-color:#2563eb}
+		.sblr-tabs{height:40px;display:flex;align-items:center;gap:6px;padding:0 10px;margin:8px 0;border-radius:8px;box-shadow:0 12px 28px rgba(64,91,160,.08)}
+		.sblr-tab{height:28px;display:inline-flex;align-items:center;padding:0 14px;border:0;border-radius:7px;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sblr-tab.active{color:#fff;background:#2563eb;box-shadow:0 6px 14px rgba(37,99,235,.22)}
 		.sblr-title h2{margin:0 0 3px;font-size:17px;line-height:1.1;color:#fff}
 		.sblr-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.25}
 		.sblr-actions,.sblr-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
