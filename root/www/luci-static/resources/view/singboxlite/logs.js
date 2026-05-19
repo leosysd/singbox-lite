@@ -198,6 +198,8 @@ function setSource(source) {
 }
 
 function setAutoRefresh(enabled) {
+	var checkbox = document.getElementById('sbll-auto-refresh');
+
 	if (refreshTimer) {
 		window.clearInterval(refreshTimer);
 		refreshTimer = null;
@@ -209,7 +211,9 @@ function setAutoRefresh(enabled) {
 				return;
 			}
 			refreshLog();
-		}, 5000);
+			}, 5000);
+	if (checkbox)
+		checkbox.checked = enabled ? true : false;
 	updateText('sbll-auto-value', enabled ? '开启' : '关闭');
 	updateText('sbll-auto-meta', enabled ? '每 5 秒刷新一次' : '手动刷新');
 }
@@ -237,6 +241,8 @@ function cleanCurrentLog() {
 
 function saveLogSettings(message, writeCron) {
 	uci.set('singboxlite', 'log', 'tail_lines', val('sbll-lines') || '200');
+	var autoRefresh = document.getElementById('sbll-auto-refresh');
+	uci.set('singboxlite', 'log', 'auto_refresh', autoRefresh && autoRefresh.checked ? '1' : '0');
 
 	return uci.save().then(function() {
 		if (writeCron)
@@ -270,7 +276,7 @@ function css() {
 		.sbll-stat{padding:12px 13px;min-height:58px}
 		.sbll-stat-label{font-size:11px;color:#5f7088;text-transform:uppercase;font-weight:800;margin-bottom:4px}
 		.sbll-stat-value{font-size:13px;font-weight:900;color:#102038;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbll-stat-value.ok{color:#008763}.sbll-stat-value.warn{color:#b76b05}.sbll-stat-value.danger{color:#dc2947}
+			.sbll-stat-value.ok{color:#008763}.sbll-stat-value.warn{color:#b76b05}.sbll-stat-value.danger{color:#dc2947}
 		.sbll-stat-meta{font-size:11px;color:#7a8ba3;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 		.sbll-toolbar{padding:10px 13px;margin-bottom:10px}
 		.sbll-sources{gap:5px}
@@ -316,15 +322,16 @@ return view.extend({
 		]);
 	},
 
-	render: function(data) {
-		var status = data[1] || {};
-		var initial = data[2] || {};
-		var tailLines = uci.get('singboxlite', 'log', 'tail_lines') || '200';
-		var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
-		var page;
+		render: function(data) {
+			var status = data[1] || {};
+			var initial = data[2] || {};
+			var tailLines = uci.get('singboxlite', 'log', 'tail_lines') || '200';
+			var autoRefresh = uci.get('singboxlite', 'log', 'auto_refresh') === '1';
+			var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
+			var page;
 
-		setAutoRefresh(false);
-		lastStatus = status;
+			setAutoRefresh(false);
+			lastStatus = status;
 
 		page = E('div', { 'class': 'sbll-page', id: 'sbll-page' }, [
 			css(),
@@ -342,11 +349,11 @@ return view.extend({
 				])
 			]),
 			E('div', { 'class': 'sbll-stats' }, [
-				statCard('当前来源', 'Sing-box 日志', sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
-				statCard('日志大小', formatBytes(initial.size || status.log_size || 0), '建议清理或启用轮转', (initial.size || status.log_size || 0) > 1024 * 1024 ? 'danger' : ''),
-				statCard('匹配结果', '-', '错误 0 · 警告 0 · 信息 0', '', 'sbll-match-value', 'sbll-match-meta'),
-				statCard('自动刷新', '关闭', '手动刷新', '', 'sbll-auto-value', 'sbll-auto-meta')
-			]),
+					statCard('当前来源', 'Sing-box 日志', sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
+					statCard('日志大小', formatBytes(initial.size || status.log_size || 0), '建议清理或启用轮转', (initial.size || status.log_size || 0) > 1024 * 1024 ? 'danger' : ''),
+					statCard('匹配结果', '-', '错误 0 · 警告 0 · 信息 0', '', 'sbll-match-value', 'sbll-match-meta'),
+					statCard('自动刷新', autoRefresh ? '开启' : '关闭', autoRefresh ? '每 5 秒刷新一次' : '手动刷新', autoRefresh ? 'ok' : '', 'sbll-auto-value', 'sbll-auto-meta')
+				]),
 			E('div', { 'class': 'sbll-panel sbll-toolbar' }, [
 				E('div', { 'class': 'sbll-sources' }, [
 					E('button', { 'class': 'sbll-source active', 'data-source': 'singbox', 'click': function() { return setSource('singbox'); } }, 'Sing-box'),
@@ -354,7 +361,10 @@ return view.extend({
 					E('button', { 'class': 'sbll-source', 'data-source': 'app', 'click': function() { return setSource('app'); } }, '软件')
 				]),
 				E('label', { 'class': 'sbll-switchline' }, [
-					E('input', { id: 'sbll-auto-refresh', type: 'checkbox', 'change': function(ev) { setAutoRefresh(ev.target.checked); } }),
+					E('input', { id: 'sbll-auto-refresh', type: 'checkbox', checked: autoRefresh ? true : null, 'change': function(ev) {
+						setAutoRefresh(ev.target.checked);
+						return saveLogSettings('', false);
+					} }),
 					E('span', { 'class': 'sbll-switch' }),
 					E('b', {}, '自动刷新')
 				]),
@@ -411,16 +421,17 @@ return view.extend({
 					])
 				])
 			]),
-			E('div', { 'class': 'sbll-footer' }, [
-				E('button', { 'class': 'sbll-btn primary', 'click': function() { return saveLogSettings('已保存并应用日志设置', true); } }, '✓ 保存并应用'),
-				E('button', { 'class': 'sbll-btn', 'click': function() { return saveLogSettings('已保存日志设置', false); } }, '保存'),
-				E('button', { 'class': 'sbll-btn danger', 'click': function() { location.reload(); } }, '重置')
-			])
+				E('div', { 'class': 'sbll-footer' }, [
+					E('button', { 'class': 'sbll-btn primary', 'click': function() { return saveLogSettings('已保存显示行数与自动刷新设置', false); } }, '✓ 保存显示设置'),
+					E('button', { 'class': 'sbll-btn', 'click': function() { return saveLogSettings('已写入自动清理定时任务', true); } }, '写入自动清理任务'),
+					E('button', { 'class': 'sbll-btn danger', 'click': function() { location.reload(); } }, '重置')
+				])
 		]);
 
-		window.setTimeout(function() {
-			renderLog(initial.log || initial.output || '', initial.size);
-		}, 0);
+			window.setTimeout(function() {
+				renderLog(initial.log || initial.output || '', initial.size);
+				setAutoRefresh(autoRefresh);
+			}, 0);
 
 		return page;
 	},

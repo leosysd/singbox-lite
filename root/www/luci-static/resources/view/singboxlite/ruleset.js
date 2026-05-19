@@ -325,7 +325,7 @@ return view.extend({
 				])
 			]),
 			E('div', { 'class': 'sblr-footer' }, [
-				E('button', { 'class': 'sblr-btn primary', 'click': function() { return saveRuleset('已保存并应用规则集设置', true, true); } }, '✓ 保存并应用'),
+				E('button', { 'class': 'sblr-btn primary', 'click': function() { return saveRuleset('已保存并写入规则集定时任务', true, true); } }, '✓ 保存并写入定时任务'),
 				E('button', { 'class': 'sblr-btn', 'click': function() { return saveRuleset('已保存规则集设置，等待应用', false, false); } }, '保存'),
 				E('button', { 'class': 'sblr-btn danger', 'click': function() { location.reload(); } }, '重置')
 			])

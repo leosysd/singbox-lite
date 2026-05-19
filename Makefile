@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-singbox-lite
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Codex
 PKGARCH:=all
@@ -41,6 +41,7 @@ uci -q get singboxlite.ruleset.update_time >/dev/null || uci -q set singboxlite.
 uci -q get singboxlite.ruleset.update_weekday >/dev/null || uci -q set singboxlite.ruleset.update_weekday='2'
 uci -q get singboxlite.ruleset.restart_singbox >/dev/null || uci -q set singboxlite.ruleset.restart_singbox='0'
 uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='1'
+uci -q get singboxlite.log.auto_refresh >/dev/null || uci -q set singboxlite.log.auto_refresh='0'
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
 uci -q set singboxlite.main.source_path='/etc/sing-box/singboxlite/source.json'

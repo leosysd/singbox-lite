@@ -29,6 +29,7 @@ config log 'log'
 	option cleanup_enabled '1'
 	option cleanup_time '03:10'
 	option tail_lines '200'
+	option auto_refresh '0'
 
 config ruleset 'ruleset'
 	option repo_raw 'https://raw.githubusercontent.com/leosysd/ruleset/main/dist'
