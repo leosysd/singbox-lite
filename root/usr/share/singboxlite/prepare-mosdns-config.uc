@@ -9,64 +9,6 @@ function fail(message) {
 	exit(1);
 }
 
-function array_has(items, needle) {
-	if (type(items) != 'array')
-		return false;
-
-	for (let i = 0; i < length(items); i++) {
-		if (items[i] == needle)
-			return true;
-	}
-
-	return false;
-}
-
-function ensure_direct_dns_upstreams(route) {
-	if (type(route) != 'object' || type(route.rules) != 'array')
-		return;
-
-	let cidrs = [
-		'223.5.5.5/32',
-		'119.29.29.29/32',
-		'114.114.114.114/32',
-		'114.114.115.115/32'
-	];
-	let target = null;
-
-	for (let i = 0; i < length(route.rules); i++) {
-		let rule = route.rules[i];
-
-		if (type(rule) == 'object' && rule.outbound == 'direct' && type(rule.ip_cidr) == 'array') {
-			target = rule;
-			break;
-		}
-	}
-
-	if (target == null) {
-		target = {
-			ip_cidr: [],
-			outbound: 'direct'
-		};
-
-		let insert_at = length(route.rules);
-		for (let i = 0; i < length(route.rules); i++) {
-			let rule = route.rules[i];
-
-			if (type(rule) == 'object' && rule.outbound != 'direct' && rule.network != null) {
-				insert_at = i;
-				break;
-			}
-		}
-
-		splice(route.rules, insert_at, 0, target);
-	}
-
-	for (let i = 0; i < length(cidrs); i++) {
-		if (!array_has(target.ip_cidr, cidrs[i]))
-			push(target.ip_cidr, cidrs[i]);
-	}
-}
-
 let source = ARGV[0] || '';
 let target = ARGV[1] || '';
 let mosdns_addr = ARGV[2] || '127.0.0.1';
@@ -130,7 +72,6 @@ if (type(config.route) == 'object') {
 	}
 
 	config.route.default_domain_resolver = 'mosdns';
-	ensure_direct_dns_upstreams(config.route);
 }
 
 writefile(target, sprintf('%.J\n', config));

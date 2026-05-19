@@ -305,7 +305,8 @@ function start_mosdns_for_apply() {
 	uci.set('mosdns', 'config', 'local_dns_redirect', '0');
 	uci.commit('mosdns');
 
-	let res = exec_cmd('/etc/init.d/mosdns restart');
+	let action = restart_mosdns_after_apply() ? 'restart' : 'start';
+	let res = exec_cmd('/etc/init.d/mosdns ' + action);
 	if (res.code !== 0)
 		return { ok: false, output: res.stdout };
 
@@ -315,7 +316,7 @@ function start_mosdns_for_apply() {
 	if (status.code !== 0 || !match(status.stdout, /running/i))
 		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'MosDNS 启动后未保持运行')) };
 
-	return { ok: true, output: res.stdout || 'MosDNS 已启动' };
+	return { ok: true, output: res.stdout || (action == 'restart' ? 'MosDNS 已重启' : 'MosDNS 已启动') };
 }
 
 function enable_mosdns_internal() {
@@ -412,6 +413,18 @@ function rollback_after_failed_apply(backup, failed) {
 		mosdns: mosdns,
 		dnsmasq: dnsmasq,
 		singbox: singbox
+	};
+}
+
+function rollback_step(step, backup, failed) {
+	let rollback = rollback_after_failed_apply(backup, failed);
+	return {
+		ok: false,
+		step: step,
+		output: rollback.output,
+		backup: backup,
+		mode: 'singbox_dns',
+		rollback: rollback
 	};
 }
 
@@ -540,6 +553,7 @@ function apply_config(path, source) {
 	let prepared = null;
 	let apply_path = path;
 	let checked = null;
+	let backup = null;
 
 	if (mode == 'singbox_mosdns') {
 		prepared = prepare_mosdns_config(path);
@@ -564,6 +578,10 @@ function apply_config(path, source) {
 	if (!source_store.ok)
 		return { ok: false, step: 'source_store', output: source_store.output };
 
+	backup = backup_current();
+	if (!backup.ok)
+		return { ok: false, step: 'backup', output: backup.output };
+
 	let stopped = stop_singbox_for_apply();
 	if (!stopped.ok)
 		return { ok: false, step: 'stop_singbox', output: stopped.output };
@@ -572,47 +590,44 @@ function apply_config(path, source) {
 		? install_dns_hijack_script()
 		: uninstall_dns_hijack_script();
 	if (!script.ok)
-		return { ok: false, step: 'dns_hijack_script', output: script.output };
+		return rollback_step('dns_hijack_script', backup.backup, script);
 
 	let mosdns = mode == 'singbox_dns' ? stop_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns.ok)
-		return { ok: false, step: 'mosdns', output: mosdns.output };
+		return rollback_step('mosdns', backup.backup, mosdns);
 
 	let dnsmasq = mode == 'singbox_dns' ? cleanup_dnsmasq_mosdns_upstream() : { ok: true, skipped: true };
 	if (!dnsmasq.ok)
-		return { ok: false, step: 'dnsmasq', output: dnsmasq.output };
+		return rollback_step('dnsmasq', backup.backup, dnsmasq);
 
 	let mosdns_enable = mode == 'singbox_mosdns' ? enable_mosdns_internal() : { ok: true, skipped: true };
 	if (!mosdns_enable.ok)
-		return { ok: false, step: 'mosdns_enable', output: mosdns_enable.output };
-
-	let backup = backup_current();
-	if (!backup.ok)
-		return { ok: false, step: 'backup', output: backup.output };
+		return rollback_step('mosdns_enable', backup.backup, mosdns_enable);
 
 	let dest = config_path();
 	exec_cmd('mkdir -p ' + shellquote(replace(dest, /\/[^\/]+$/, '')));
 	let copied = exec_cmd('cp ' + shellquote(apply_path) + ' ' + shellquote(dest));
 	if (copied.code !== 0)
-		return { ok: false, step: 'copy', output: copied.stdout, backup: backup.backup };
+		return rollback_step('copy', backup.backup, { ok: false, output: copied.stdout || '复制配置失败' });
 
 	let mosdns_after = mode == 'singbox_mosdns'
 		? start_mosdns_for_apply()
 		: { ok: true, skipped: true };
 	if (!mosdns_after.ok)
-		return { ok: false, step: 'mosdns_after_apply', output: mosdns_after.output, backup: backup.backup };
+		return rollback_step('mosdns_after_apply', backup.backup, mosdns_after);
 
 	let restarted = start_singbox_internal();
 	let dns_hijack_cleanup = mode == 'singbox_mosdns' && disable_dns_hijack() && restarted.ok
 		? run_dns_hijack_script()
 		: { ok: true, skipped: true };
 	if (!dns_hijack_cleanup.ok)
-		return { ok: false, step: 'dns_hijack_cleanup', output: dns_hijack_cleanup.output, backup: backup.backup };
+		return rollback_step('dns_hijack_cleanup', backup.backup, dns_hijack_cleanup);
 
 	let dns_probe = restarted.ok ? dns_probe_for_apply(mode) : { ok: false, output: restarted.output || 'sing-box 未启动，跳过 DNS 探测' };
 	if (!dns_probe.ok) {
-		let rollback = rollback_after_failed_apply(backup.backup, dns_probe);
-		return { ok: false, step: 'dns_probe', output: rollback.output, backup: backup.backup, mode: 'singbox_dns', dns_probe: dns_probe, rollback: rollback };
+		let failed = rollback_step('dns_probe', backup.backup, dns_probe);
+		failed.dns_probe = dns_probe;
+		return failed;
 	}
 
 	let cleanup = restarted.ok ? cleanup_stage_files() : { ok: true, skipped: true };
@@ -768,6 +783,10 @@ function set_cron() {
 		if (match(rows[i], /singboxlite remote config update/))
 			continue;
 		if (match(rows[i], /singboxlite ruleset update/))
+			continue;
+		if (match(rows[i], /\/usr\/bin\/update-geosite-rules[ \t]+update/))
+			continue;
+		if (match(rows[i], /\/usr\/share\/mosdns\/mosdns\.uc[ \t]+update/))
 			continue;
 		if (rows[i] != '' || i < length(rows) - 1)
 			push(kept, rows[i]);

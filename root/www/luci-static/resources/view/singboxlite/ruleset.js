@@ -278,7 +278,7 @@ return view.extend({
 				statCard('更新状态', status.ruleset_last_update_result || '-', status.ruleset_last_update_time || '-', status.ruleset_last_update_result === 'pass' ? 'ok' : 'warn'),
 				statCard('sing-box 目录', singboxDir, '输出 .srs / .json'),
 				statCard('MosDNS 目录', mosdnsDir, '输出 .txt'),
-				statCard('定时更新', autoUpdate ? weekdayName(updateWeekday) + ' ' + updateTime : '关闭', autoUpdate ? '更新后按开关重启服务' : '不会写入规则集 cron')
+					statCard('定时更新', autoUpdate ? weekdayName(updateWeekday) + ' ' + updateTime : '关闭', autoUpdate ? '仅运行中的服务会被重启' : '不会写入规则集 cron')
 			]),
 			E('div', { 'class': 'sblr-grid' }, [
 				E('div', {}, [
@@ -298,18 +298,20 @@ return view.extend({
 								field('时间', input('sblr-time', updateTime, '07:45'))
 							]),
 							E('div', { 'class': 'sblr-box' }, [
-								E('h4', {}, '更新后动作'),
-								field('重启 sing-box', toggle('sblr-restart-sb', restartSingbox, restartSingbox ? '开启' : '关闭')),
-								field('重启 MosDNS', toggle('sblr-restart-md', restartMosdns, restartMosdns ? '开启' : '关闭')),
-								field('失败处理', input('sblr-fail-policy', '保留旧规则文件'))
-							])
-						]),
+									E('h4', {}, '更新后动作'),
+									field('重启 sing-box', toggle('sblr-restart-sb', restartSingbox, restartSingbox ? '开启' : '关闭')),
+									field('重启 MosDNS', toggle('sblr-restart-md', restartMosdns, restartMosdns ? '开启' : '关闭')),
+									field('失败处理', E('span', { 'class': 'sblr-flow-meta' }, '下载未全部成功时保留旧规则'))
+								])
+							]),
 						E('div', { 'class': 'sblr-box' }, [
 							E('h4', {}, '执行流程'),
-							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '1'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '下载 6 个成品文件'), E('span', {}, 'srs / json / txt 分别用于 sing-box 和 MosDNS') ]), E('span', { 'class': 'sblr-flow-meta' }, '30s 超时') ]),
-							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '2'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '写入临时目录'), E('span', {}, '全部下载成功后再替换正式文件') ]), E('span', { 'class': 'sblr-flow-meta' }, '/etc/sing-box/singboxlite/ruleset') ]),
-							E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '3'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '备份并替换'), E('span', {}, '旧规则保留 .bak，避免半更新状态') ]), E('span', { 'class': 'sblr-flow-meta' }, 'atomic replace') ])
-						])
+								E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '1'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '下载 6 个成品文件'), E('span', {}, 'srs / json / txt 分别用于 sing-box 和 MosDNS') ]), E('span', { 'class': 'sblr-flow-meta' }, '30s 超时') ]),
+								E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '2'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '写入临时目录'), E('span', {}, '全部下载成功后再替换正式文件') ]), E('span', { 'class': 'sblr-flow-meta' }, '/etc/sing-box/singboxlite/ruleset') ]),
+								E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '3'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '备份并替换'), E('span', {}, '旧规则保留 .bak，避免半更新状态') ]), E('span', { 'class': 'sblr-flow-meta' }, 'atomic replace') ]),
+								E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '4'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '按运行状态重启 MosDNS'), E('span', {}, '只有 MosDNS 正在运行且开关开启才会重启') ]), E('span', { 'class': 'sblr-flow-meta' }, 'wait 10s') ]),
+								E('div', { 'class': 'sblr-flow-row' }, [ E('span', { 'class': 'sblr-step' }, '5'), E('div', { 'class': 'sblr-flow-main' }, [ E('b', {}, '按运行状态重启 sing-box'), E('span', {}, '只有 sing-box 正在运行且开关开启才会重启') ]), E('span', { 'class': 'sblr-flow-meta' }, 'optional') ])
+							])
 					])
 				]),
 				E('div', {}, [

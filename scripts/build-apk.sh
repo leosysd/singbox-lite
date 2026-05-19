@@ -68,7 +68,7 @@ uci -q get singboxlite.ruleset.auto_update >/dev/null || uci -q set singboxlite.
 uci -q get singboxlite.ruleset.update_time >/dev/null || uci -q set singboxlite.ruleset.update_time='07:45'
 uci -q get singboxlite.ruleset.update_weekday >/dev/null || uci -q set singboxlite.ruleset.update_weekday='2'
 uci -q get singboxlite.ruleset.restart_singbox >/dev/null || uci -q set singboxlite.ruleset.restart_singbox='0'
-uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='0'
+uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='1'
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
 uci -q set singboxlite.main.source_path='/etc/sing-box/singboxlite/source.json'

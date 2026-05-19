@@ -133,13 +133,13 @@ function saveSettings(message, applyCron, applyNow) {
 		remote_auto: yes('sbl-remote-auto'),
 		remote_time: val('sbl-remote-time') || uci.get('singboxlite', 'remote', 'auto_update_time') || '03:00',
 		remote_apply: yes('sbl-remote-apply'),
-		mosdns_addr: val('sbl-mosdns-addr') || '127.0.0.1',
-		mosdns_port: val('sbl-mosdns-port') || '5335',
-		disable_dns_hijack: yes('sbl-disable-dns-hijack'),
-		restart_mosdns: true,
-		clean_log: yes('sbl-clean-log'),
-		tail_lines: val('sbl-tail-lines') || '200'
-	}).then(function() {
+			mosdns_addr: val('sbl-mosdns-addr') || '127.0.0.1',
+			mosdns_port: val('sbl-mosdns-port') || '5335',
+			disable_dns_hijack: yes('sbl-disable-dns-hijack'),
+			restart_mosdns: yes('sbl-restart-mosdns'),
+			clean_log: yes('sbl-clean-log'),
+			tail_lines: val('sbl-tail-lines') || '200'
+		}).then(function() {
 		if (applyCron)
 			return callSetCron();
 	}).then(function(res) {
@@ -239,15 +239,16 @@ function css() {
 		.sbl-switch:before{content:"";position:absolute;width:13px;height:13px;border-radius:999px;background:#fff;left:2px;top:2px;transition:.15s}
 		.sbl-toggle input:checked+.sbl-switch{background:#5b6ee1}
 		.sbl-toggle input:checked+.sbl-switch:before{transform:translateX(15px)}
-		.sbl-meta-list{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
-		.sbl-meta{display:flex;justify-content:space-between;border-bottom:1px solid #e4eaf2;padding:8px 0;gap:12px}
-		.sbl-meta span{color:#5f7088}.sbl-meta b{color:#102038}
-		.sbl-flow{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
-		.sbl-flow-row{display:flex;justify-content:space-between;border-bottom:1px solid #e4eaf2;padding:8px 0;color:#5f7088}
-		.sbl-flow-row b{color:#102038}
-		.sbl-footer{justify-content:flex-end;margin-top:2px}
-		@media(max-width:1100px){.sbl-grid,.sbl-settings,.sbl-import-grid,.sbl-stats{grid-template-columns:1fr}.sbl-hero{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:120px minmax(0,1fr)}}
-	`);
+			.sbl-meta-list{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+			.sbl-meta{display:flex;justify-content:space-between;border-bottom:1px solid #e4eaf2;padding:8px 0;gap:12px}
+			.sbl-meta span{color:#5f7088}.sbl-meta b{color:#102038}
+			.sbl-flow{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+			.sbl-flow-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:8px;align-items:center;border-bottom:1px solid #e4eaf2;padding:8px 0;color:#5f7088}
+			.sbl-flow-row b{display:block;color:#102038;margin-bottom:2px}.sbl-flow-row span:last-child{font-size:11px}
+			.sbl-step{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:#eef2ff;color:#4f62df;font-weight:900}
+			.sbl-footer{justify-content:flex-end;margin-top:2px}
+			@media(max-width:1100px){.sbl-grid,.sbl-settings,.sbl-import-grid,.sbl-stats{grid-template-columns:1fr}.sbl-hero{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:120px minmax(0,1fr)}}
+		`);
 }
 
 return view.extend({
@@ -279,9 +280,12 @@ return view.extend({
 		var dnsMeta = activeMode === 'singbox_mosdns'
 			? (status.dns_hijack_script_installed ? 'DNS DNAT 清理脚本已安装' : 'DNS DNAT 清理脚本未安装')
 			: (status.dns_hijack_script_installed ? '清理脚本仍存在' : 'DNS 劫持由 sing-box 处理');
-		var dnsTone = activeMode === 'singbox_mosdns'
-			? (status.mosdns_running ? 'ok' : 'warn')
-			: (status.dns_hijack_script_installed ? 'warn' : 'ok');
+			var dnsTone = activeMode === 'singbox_mosdns'
+				? (status.mosdns_running ? 'ok' : 'warn')
+				: (status.dns_hijack_script_installed ? 'warn' : 'ok');
+			var selectedModeMeta = mode === activeMode
+				? (activeMode === 'singbox_mosdns' ? '配置与运行状态一致' : '配置与运行状态一致')
+				: '选择未应用，当前仍是 ' + modeText(activeMode);
 
 		return E('div', { 'class': 'sbl-page' }, [
 			css(),
@@ -314,10 +318,10 @@ return view.extend({
 			]),
 			E('div', { 'class': 'sbl-stats' }, [
 				statCard('sing-box', status.singbox_running ? '运行中' : (status.singbox_installed ? '未运行' : '未安装'), (status.singbox_version || '').replace(/^sing-box /, '') + (status.singbox_pid ? ' · PID ' + status.singbox_pid : ''), status.singbox_running ? 'ok' : 'warn'),
-				statCard('配置', status.config_path || configPath, '备份 ' + (status.backup_count || 0) + ' 个 · 上次应用 -'),
-				statCard('DNS', dnsTitle, dnsMeta, dnsTone),
-				statCard('模式', modeText(activeMode), activeMode === 'singbox_mosdns' ? '会替换导入配置的 DNS 段' : '由 sing-box 接管 DNS')
-			]),
+					statCard('配置', status.config_path || configPath, '备份 ' + (status.backup_count || 0) + ' 个 · 上次应用 ' + (status.last_apply_time || '-')),
+					statCard('DNS', dnsTitle, dnsMeta, dnsTone),
+					statCard('模式', modeText(mode), selectedModeMeta, mode === activeMode ? 'ok' : 'warn')
+				]),
 			E('div', { 'class': 'sbl-grid' }, [
 				E('div', {}, [
 					E('div', { 'class': 'sbl-panel sbl-card' }, [
@@ -385,6 +389,7 @@ return view.extend({
 								field('MosDNS 地址', input('sbl-mosdns-addr', mosdnsAddr)),
 								field('MosDNS 端口', input('sbl-mosdns-port', mosdnsPort)),
 								field('禁用 DNS 劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
+								field('重启 MosDNS', toggle('sbl-restart-mosdns', restartMosdns, restartMosdns ? '应用时重启' : '仅写入配置')),
 								field('应用顺序', E('span', { 'class': 'sbl-muted' }, 'MosDNS 模式会先启动 MosDNS，等待 10 秒确认运行，再启动 sing-box'))
 							]),
 							E('div', { 'class': 'sbl-section' }, [
@@ -395,18 +400,20 @@ return view.extend({
 							])
 						])
 					]),
-					E('div', { 'class': 'sbl-panel sbl-card' }, [
-						E('h3', {}, '应用流程'),
-						E('div', { 'class': 'sbl-flow' }, [
-							E('div', {}, [
-								E('div', { 'class': 'sbl-flow-row' }, [ E('span', {}, '1. 导入'), E('b', {}, '本地或远程 JSON') ]),
-								E('div', { 'class': 'sbl-flow-row' }, [ E('span', {}, '3. 备份'), E('b', {}, '保留旧配置') ])
-							]),
-							E('div', {}, [
-								E('div', { 'class': 'sbl-flow-row' }, [ E('span', {}, '2. 检查'), E('b', {}, 'sing-box check') ]),
-								E('div', { 'class': 'sbl-flow-row' }, [ E('span', {}, '4. 应用'), E('b', {}, '重启相关服务') ])
+						E('div', { 'class': 'sbl-panel sbl-card' }, [
+							E('h3', {}, '应用流程'),
+							E('div', { 'class': 'sbl-flow' }, [
+								E('div', {}, [
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '1'), E('div', {}, [ E('b', {}, '准备配置'), E('span', {}, '按当前模式处理导入 JSON') ]), E('span', {}, 'prepare') ]),
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '3'), E('div', {}, [ E('b', {}, '备份旧配置'), E('span', {}, '失败时可恢复到 sing-box 模式') ]), E('span', {}, 'backup') ]),
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '5'), E('div', {}, [ E('b', {}, '启动相关服务'), E('span', {}, 'MosDNS 模式先等 10 秒再启动 sing-box') ]), E('span', {}, 'restart') ])
+								]),
+								E('div', {}, [
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '2'), E('div', {}, [ E('b', {}, '检查配置'), E('span', {}, 'sing-box check 通过才继续') ]), E('span', {}, 'check') ]),
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '4'), E('div', {}, [ E('b', {}, '写入正式配置'), E('span', {}, '同时处理 MosDNS/dnsmasq 联动') ]), E('span', {}, 'apply') ]),
+									E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '6'), E('div', {}, [ E('b', {}, 'DNS 探测'), E('span', {}, '失败会自动回滚，避免保持断网状态') ]), E('span', {}, 'probe') ])
+								])
 							])
-						])
 					])
 				])
 			]),
