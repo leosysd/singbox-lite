@@ -331,6 +331,18 @@ function overviewItem(label, value) {
 	]);
 }
 
+function singboxOverviewItem(status) {
+	var running = !!status.singbox_running;
+	var version = versionShort(status.singbox_version || '-');
+	var meta = running ? '运行中' + (status.singbox_pid ? ' · PID ' + status.singbox_pid : '') : '未运行';
+
+	return E('div', { 'class': 'sbl-overview-item sbl-service-card' }, [
+		E('span', {}, 'sing-box 版本'),
+		E('b', {}, version),
+		E('em', { 'class': 'sbl-service-meta ' + (running ? 'ok' : 'danger') }, meta)
+	]);
+}
+
 function tabButton(id, label) {
 	return E('button', { 'class': 'sbl-tab ' + (activeTab === id ? 'active' : ''), 'data-tab': id, 'click': function() { switchTab(id); } }, label);
 }
@@ -708,7 +720,7 @@ function renderOverviewPanel(status) {
 			E('span', { 'class': 'sbl-enabled' }, status.singbox_running ? '已启用' : '未运行')
 		]),
 		E('div', { 'class': 'sbl-overview-strip' }, [
-			overviewItem('sing-box 版本', (status.singbox_version || '-').replace(/^sing-box version /, '').replace(/^sing-box /, '')),
+			singboxOverviewItem(status),
 			overviewItem('PID', status.singbox_pid || '-'),
 			overviewItem('MosDNS', status.mosdns_running ? 'running' : 'not running'),
 			overviewItem('日志大小', '%1024.2mB'.format(status.log_size || 0)),
@@ -941,6 +953,7 @@ function css() {
 		.sbl-overview-strip,.sbl-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:8px}.sbl-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
 		.sbl-overview-item,.sbl-stat{min-height:54px;background:#fff;border:1px solid #d8e4f5;border-radius:10px;padding:9px 11px;box-shadow:0 12px 28px rgba(64,91,160,.07);overflow:hidden;box-sizing:border-box}
 		.sbl-overview-item span,.sbl-stat-label{display:block;color:#65758f;font-weight:800;margin-bottom:4px;font-size:11px}.sbl-overview-item b,.sbl-stat-value{display:block;color:#132845;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbl-stat-value.ok{color:#008763}.sbl-stat-value.warn{color:#b76b05}.sbl-stat-value.danger{color:#dc2947}.sbl-stat-meta{font-size:11px;color:#7a8ba3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbl-service-card{min-height:66px}.sbl-service-meta{display:block;margin-top:5px;font-style:normal;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbl-service-meta.ok{color:#008763}.sbl-service-meta.danger{color:#dc2947}
 		.sbl-main{display:grid;gap:10px}.sbl-op-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.sbl-op-card{min-height:112px;border:1px solid #d8e4f5;border-radius:10px;background:#fff;padding:13px;box-sizing:border-box}.sbl-op-card h3,.sbl-card>h3{margin:0 0 8px;font-size:14px;color:#263959}.sbl-op-card p{margin:0 0 14px;color:#70849f;line-height:1.45;min-height:32px}.sbl-core-card .sbl-op-actions{margin:10px 0 8px}.sbl-core-toggle{margin:2px 0 8px}.sbl-core-meta{color:#5f7088;font-size:12px;line-height:1.35}.sbl-core-meta span{color:#263959;font-weight:800}
 		.sbl-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}.sbl-card{padding:12px;margin-bottom:8px}.sbl-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sbl-section{border:1px solid #dce7f6;border-radius:10px;padding:10px;background:#fbfdff}.sbl-section.compact{padding:8px 10px;margin-bottom:8px}.sbl-section h4{margin:0 0 6px;font-size:12px;color:#263959}
 		.sbl-field{display:grid;grid-template-columns:108px minmax(0,1fr);align-items:center;gap:8px;margin:6px 0}.sbl-field>span{font-weight:800;color:#425672;text-align:right}.sbl-input{height:29px;border:1px solid #cbd8e8;border-radius:8px;background:#fff;color:#102038;box-sizing:border-box;padding:0 9px;width:100%;font-size:12px}.sbl-small-input{width:auto;min-width:118px}.sbl-search{flex:1 1 340px;min-width:240px}
