@@ -175,6 +175,7 @@ function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
 		.sblr-page{color:#0f1f35;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
+		.sblr-page>*{max-width:1440px;margin-left:auto;margin-right:auto}
 		.sblr-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
 		.sblr-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;margin-bottom:10px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
 		.sblr-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
