@@ -11,7 +11,6 @@ var lastStatus = {};
 
 var callStatus = rpc.declare({ object: 'luci.singboxlite', method: 'status', expect: { '': {} } });
 var callTailSourceLog = rpc.declare({ object: 'luci.singboxlite', method: 'tail_source_log', params: [ 'source', 'lines' ], expect: { '': {} } });
-var callCleanLog = rpc.declare({ object: 'luci.singboxlite', method: 'clean_log', expect: { '': {} } });
 var callClearRulesetLog = rpc.declare({ object: 'luci.singboxlite', method: 'clear_ruleset_log', expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
 
@@ -31,7 +30,7 @@ function sourceLabel(source) {
 		return '系统日志';
 	if (source === 'app')
 		return '软件日志';
-	return 'Sing-box 日志';
+	return 'sing-box 日志';
 }
 
 function sourcePath(source) {
@@ -63,6 +62,16 @@ function levelOf(line) {
 	return 'info';
 }
 
+function levelLabel(level) {
+	if (level === 'error')
+		return '错误';
+	if (level === 'warn')
+		return '警告';
+	if (level === 'debug')
+		return '调试';
+	return '信息';
+}
+
 function timeOf(line) {
 	var m = line.match(/(\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2})/);
 	if (m)
@@ -74,8 +83,30 @@ function timeOf(line) {
 function topicOf(line) {
 	var m = line.match(/\b(dns|route|inbound|outbound|service|cache|ruleset|rule_set)\b/i);
 	if (!m)
-		return activeSource;
-	return m[1].replace('_', '-').toLowerCase();
+		return sourceLabel(activeSource);
+
+	var topic = m[1].replace('_', '-').toLowerCase();
+	if (topic === 'route')
+		return '路由';
+	if (topic === 'inbound')
+		return '入站';
+	if (topic === 'outbound')
+		return '出站';
+	if (topic === 'service')
+		return '服务';
+	if (topic === 'cache')
+		return '缓存';
+	if (topic === 'ruleset' || topic === 'rule-set')
+		return '规则集';
+	return 'DNS';
+}
+
+function sourceButtonLabel(source) {
+	if (source === 'system')
+		return '系统日志';
+	if (source === 'app')
+		return '软件日志';
+	return 'sing-box 日志';
 }
 
 function statCard(label, value, meta, tone, idValue, idMeta) {
@@ -143,7 +174,6 @@ function renderSummary(lines, counts) {
 
 function renderLog(raw, size) {
 	var list = document.getElementById('sbll-list');
-	var rawBox = document.getElementById('sbll-raw');
 	var lines;
 	var counts = { error: 0, warn: 0, info: 0, debug: 0 };
 
@@ -152,9 +182,6 @@ function renderLog(raw, size) {
 	lines.forEach(function(line) {
 		counts[levelOf(line)]++;
 	});
-
-	if (rawBox)
-		rawBox.textContent = lastRawLog || '暂无日志';
 
 	updateText('sbll-source-value', sourceLabel(activeSource));
 	updateText('sbll-source-meta', sourcePath(activeSource));
@@ -171,9 +198,9 @@ function renderLog(raw, size) {
 		list.appendChild(E('div', { 'class': 'sbll-row ' + activeSource }, [
 			E('div', { 'class': 'sbll-index' }, '-'),
 			E('div', { 'class': 'sbll-time' }, '-'),
-			E('div', { 'class': 'sbll-level info' }, 'INFO'),
+			E('div', { 'class': 'sbll-level info' }, '信息'),
 			E('div', { 'class': 'sbll-msg' }, '暂无匹配日志'),
-			E('div', { 'class': 'sbll-topic' }, activeSource)
+			E('div', { 'class': 'sbll-topic' }, sourceLabel(activeSource))
 		]));
 		return;
 	}
@@ -183,7 +210,7 @@ function renderLog(raw, size) {
 		list.appendChild(E('div', { 'class': 'sbll-row ' + level + ' ' + activeSource, title: line }, [
 			E('div', { 'class': 'sbll-index' }, String(idx + 1)),
 			E('div', { 'class': 'sbll-time' }, timeOf(line)),
-			E('div', { 'class': 'sbll-level ' + level }, level.toUpperCase()),
+			E('div', { 'class': 'sbll-level ' + level }, levelLabel(level)),
 			E('div', { 'class': 'sbll-msg' }, line),
 			E('div', { 'class': 'sbll-topic' }, topicOf(line))
 		]));
@@ -271,30 +298,30 @@ function saveLogSettings(message, writeCron) {
 function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
-		.sbll-page{color:#0f1f35;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
+		.sbll-page{color:#0f1f35;font-size:12px;margin:-12px;padding:34px 18px 18px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 76px,#eaf2ff 76px,#f7fbff 100%);min-height:calc(100vh - 110px)}
 		.sbll-shell{max-width:1440px;margin:0 auto}
-		.sbll-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
-		.sbll-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;margin-bottom:10px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
+		.sbll-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:10px;box-shadow:0 14px 34px rgba(64,91,160,.10)}
+		.sbll-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 10px;margin-bottom:8px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
 		.sbll-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
 		.sbll-title,.sbll-actions{position:relative;z-index:1}
-		.sbll-tabs{height:46px;display:flex;align-items:center;gap:2px;padding:0 12px;margin:12px 0;border-radius:8px;box-shadow:0 16px 40px rgba(64,91,160,.10)}
-		.sbll-tab{height:46px;display:inline-flex;align-items:center;padding:0 16px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
+		.sbll-tabs{height:38px;display:flex;align-items:center;gap:2px;padding:0 10px;margin:8px 0;border-radius:7px;box-shadow:0 12px 28px rgba(64,91,160,.08)}
+		.sbll-tab{height:38px;display:inline-flex;align-items:center;padding:0 14px;border:0;border-bottom:3px solid transparent;background:transparent;color:#4b6382;font-size:12px;font-weight:900;cursor:pointer}
 		.sbll-tab.active{color:#2563eb;border-bottom-color:#2563eb}
-		.sbll-title h2{margin:0 0 4px;font-size:18px;line-height:1.1;color:#fff}
-		.sbll-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.3}
+		.sbll-title h2{margin:0 0 3px;font-size:17px;line-height:1.1;color:#fff}
+		.sbll-title p{margin:0;color:rgba(255,255,255,.82);font-size:12px;line-height:1.25}
 		.sbll-actions,.sbll-toolbar,.sbll-sources,.sbll-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 		.sbll-actions{justify-content:flex-end}
-		.sbll-btn{min-height:28px;border-radius:6px;border:1px solid #b8c7ff;background:#fff;color:#4f62df;padding:0 11px;font-size:12px;font-weight:800;cursor:pointer}
+		.sbll-btn{min-height:26px;border-radius:6px;border:1px solid #b8c7ff;background:#fff;color:#4f62df;padding:0 10px;font-size:12px;font-weight:800;cursor:pointer}
 		.sbll-hero .sbll-btn:not(.primary):not(.danger){background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.24);color:#fff}
 		.sbll-btn.primary,.sbll-source.active{background:#5b6ee1;border-color:#5b6ee1;color:#fff}
 		.sbll-btn.danger{background:#f23655;border-color:#f23655;color:#fff}
-		.sbll-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
-		.sbll-stat{padding:12px 13px;min-height:58px}
-		.sbll-stat-label{font-size:11px;color:#5f7088;text-transform:uppercase;font-weight:800;margin-bottom:4px}
+		.sbll-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
+		.sbll-stat{padding:8px 10px;min-height:42px}
+		.sbll-stat-label{font-size:11px;color:#5f7088;text-transform:uppercase;font-weight:800;margin-bottom:2px}
 		.sbll-stat-value{font-size:13px;font-weight:900;color:#102038;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 			.sbll-stat-value.ok{color:#008763}.sbll-stat-value.warn{color:#b76b05}.sbll-stat-value.danger{color:#dc2947}
-		.sbll-stat-meta{font-size:11px;color:#7a8ba3;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbll-toolbar{padding:10px 13px;margin-bottom:10px}
+		.sbll-stat-meta{font-size:11px;color:#7a8ba3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+		.sbll-toolbar{padding:8px 10px;margin-bottom:8px}
 		.sbll-sources{gap:5px}
 		.sbll-source{min-height:28px;border-radius:6px;border:1px solid #cbd6e6;background:#fff;color:#102038;padding:0 11px;font-size:12px;font-weight:900;cursor:pointer}
 		.sbll-switchline{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#5f7088;font-weight:700}
@@ -303,27 +330,23 @@ function css() {
 		.sbll-switch:before{content:"";position:absolute;width:13px;height:13px;border-radius:999px;background:#fff;left:2px;top:2px;transition:.15s}
 		.sbll-switchline input:checked+.sbll-switch{background:#5b6ee1}
 		.sbll-switchline input:checked+.sbll-switch:before{transform:translateX(15px)}
-		.sbll-input{height:29px;border:1px solid #cbd6e6;border-radius:5px;background:#fff;color:#102038;box-sizing:border-box;padding:0 9px;font-size:12px}
+		.sbll-input{height:27px;border:1px solid #cbd6e6;border-radius:5px;background:#fff;color:#102038;box-sizing:border-box;padding:0 8px;font-size:12px}
 		.sbll-search{flex:1 1 340px;min-width:240px}
 		.sbll-main{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
-		.sbll-card{padding:12px 13px;margin-bottom:10px}
-		.sbll-card>h3{margin:0 0 10px;font-size:13px;color:#102038}
-		.sbll-summary{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
-		.sbll-chip{display:inline-flex;align-items:center;min-height:23px;border-radius:999px;border:1px solid #dbe3ef;background:#fbfcff;color:#5f7088;padding:0 9px;font-size:11px}
+		.sbll-card{padding:9px 10px;margin-bottom:8px}
+		.sbll-card>h3{margin:0 0 8px;font-size:13px;color:#102038}
+		.sbll-summary{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+		.sbll-chip{display:inline-flex;align-items:center;min-height:21px;border-radius:999px;border:1px solid #dbe3ef;background:#fbfcff;color:#5f7088;padding:0 8px;font-size:11px}
 		.sbll-chip b{color:#102038;margin-left:3px}.sbll-chip.error{background:#fff3f5;color:#dc2947}.sbll-chip.warn{background:#fff8df;color:#b76b05}
-		.sbll-list{border:1px solid #dbe3ef;border-radius:7px;overflow:auto;max-height:570px;background:#fff}
-		.sbll-row{display:grid;grid-template-columns:42px 150px 64px minmax(0,1fr) 72px;gap:8px;align-items:center;min-height:32px;border-bottom:1px solid #e4eaf2;border-left:3px solid #5b6ee1;padding:3px 9px}
+		.sbll-list{border:1px solid #dbe3ef;border-radius:7px;overflow:auto;max-height:calc(100vh - 405px);min-height:360px;background:#fff}
+		.sbll-row{display:grid;grid-template-columns:38px 142px 58px minmax(0,1fr) 74px;gap:7px;align-items:center;min-height:28px;border-bottom:1px solid #e4eaf2;border-left:3px solid #5b6ee1;padding:2px 8px}
 		.sbll-row:last-child{border-bottom:0}.sbll-row.warn{background:#fffdf2;border-left-color:#c87209}.sbll-row.error{background:#fff8fa;border-left-color:#f23655}.sbll-row.debug{border-left-color:#7a8ba3}
 		.sbll-index{font-size:11px;color:#7a8ba3;text-align:right;font-weight:900}
 		.sbll-time{font:11px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;color:#5f7088;background:#f5f7fb;border-radius:5px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbll-level{justify-self:start;min-width:44px;border-radius:5px;padding:2px 6px;text-align:center;font-size:10px;font-weight:900;background:#e9f2ff;color:#1d6bd8}
+		.sbll-level{justify-self:start;min-width:42px;border-radius:5px;padding:2px 6px;text-align:center;font-size:10px;font-weight:900;background:#e9f2ff;color:#1d6bd8}
 		.sbll-level.warn{background:#fff1c2;color:#a46500}.sbll-level.error{background:#ffe0e7;color:#c62844}.sbll-level.debug{background:#eef2f7;color:#5f728b}
 		.sbll-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#102038}
 		.sbll-topic{text-align:right;color:#5f7088;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbll-raw{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word;background:#0d1628;color:#dbeafe;border-radius:7px;padding:12px;min-height:320px;max-height:380px;overflow:auto;margin:0;font-size:12px;line-height:1.45}
-		.sbll-maint{display:grid;gap:9px}
-		.sbll-maint-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #dbe3ef;border-radius:7px;background:#fbfcff;padding:10px}
-		.sbll-maint-row b{display:block;color:#102038;margin-bottom:3px}.sbll-maint-row span{display:block;color:#5f7088}
 		.sbll-footer{justify-content:flex-end;margin-top:2px}
 		@media(max-width:1100px){.sbll-stats,.sbll-main{grid-template-columns:1fr}.sbll-hero{align-items:flex-start;flex-direction:column}.sbll-actions{justify-content:flex-start}.sbll-row{grid-template-columns:36px 120px 56px minmax(0,1fr)}.sbll-topic{display:none}}
 	`);
@@ -343,7 +366,6 @@ return view.extend({
 			var initial = data[2] || {};
 			var tailLines = uci.get('singboxlite', 'log', 'tail_lines') || '200';
 			var autoRefresh = uci.get('singboxlite', 'log', 'auto_refresh') === '1';
-			var cleanupTime = uci.get('singboxlite', 'log', 'cleanup_time') || '03:10';
 			var page;
 
 			setAutoRefresh(false);
@@ -355,7 +377,7 @@ return view.extend({
 			E('div', { 'class': 'sbll-panel sbll-hero' }, [
 				E('div', { 'class': 'sbll-title' }, [
 					E('h2', {}, '日志中心'),
-					E('p', {}, '按来源、级别和关键词筛选日志，保留原始输出用于复制和排错。')
+					E('p', {}, '按来源、级别和关键词筛选日志，只保留整理后的列表用于快速排错。')
 				]),
 				E('div', { 'class': 'sbll-actions' }, [
 					E('button', { 'class': 'sbll-btn primary', 'click': refreshLog }, '↻ 立即刷新'),
@@ -367,16 +389,16 @@ return view.extend({
 			]),
 			pageTabs('logs'),
 			E('div', { 'class': 'sbll-stats' }, [
-					statCard('当前来源', 'Sing-box 日志', sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
+					statCard('当前来源', sourceLabel('singbox'), sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
 					statCard('日志大小', formatBytes(initial.size || 0), activeSource === 'singbox' ? '来自系统日志 logread' : '建议清理或启用轮转', (initial.size || 0) > 1024 * 1024 ? 'danger' : ''),
 					statCard('匹配结果', '-', '错误 0 · 警告 0 · 信息 0', '', 'sbll-match-value', 'sbll-match-meta'),
 					statCard('自动刷新', autoRefresh ? '开启' : '关闭', autoRefresh ? '每 5 秒刷新一次' : '手动刷新', autoRefresh ? 'ok' : '', 'sbll-auto-value', 'sbll-auto-meta')
 				]),
 			E('div', { 'class': 'sbll-panel sbll-toolbar' }, [
 				E('div', { 'class': 'sbll-sources' }, [
-					E('button', { 'class': 'sbll-source active', 'data-source': 'singbox', 'click': function() { return setSource('singbox'); } }, 'Sing-box'),
-					E('button', { 'class': 'sbll-source', 'data-source': 'system', 'click': function() { return setSource('system'); } }, '系统'),
-					E('button', { 'class': 'sbll-source', 'data-source': 'app', 'click': function() { return setSource('app'); } }, '软件')
+					E('button', { 'class': 'sbll-source active', 'data-source': 'singbox', 'click': function() { return setSource('singbox'); } }, sourceButtonLabel('singbox')),
+					E('button', { 'class': 'sbll-source', 'data-source': 'system', 'click': function() { return setSource('system'); } }, sourceButtonLabel('system')),
+					E('button', { 'class': 'sbll-source', 'data-source': 'app', 'click': function() { return setSource('app'); } }, sourceButtonLabel('app'))
 				]),
 				E('label', { 'class': 'sbll-switchline' }, [
 					E('input', { id: 'sbll-auto-refresh', type: 'checkbox', checked: autoRefresh ? true : null, 'change': function(ev) {
@@ -394,7 +416,7 @@ return view.extend({
 					E('option', { value: 'info' }, '仅信息'),
 					E('option', { value: 'debug' }, '仅调试')
 				]),
-				E('input', { 'class': 'sbll-input sbll-search', id: 'sbll-search', placeholder: '搜索关键词，例如 DNS / route / failed', 'input': function() { renderLog(lastRawLog); } }),
+				E('input', { 'class': 'sbll-input sbll-search', id: 'sbll-search', placeholder: '搜索关键词，例如 DNS / 路由 / 失败', 'input': function() { renderLog(lastRawLog); } }),
 				E('button', { 'class': 'sbll-btn', 'click': function() {
 					document.getElementById('sbll-search').value = '';
 					document.getElementById('sbll-level').value = 'all';
@@ -406,37 +428,6 @@ return view.extend({
 				E('div', { 'class': 'sbll-panel sbll-card' }, [
 					E('div', { 'class': 'sbll-summary', id: 'sbll-summary' }),
 					E('div', { 'class': 'sbll-list', id: 'sbll-list' })
-				]),
-				E('div', {}, [
-					E('div', { 'class': 'sbll-panel sbll-card' }, [
-						E('h3', {}, '原始日志'),
-						E('pre', { 'class': 'sbll-raw', id: 'sbll-raw' }, '暂无日志')
-					]),
-					E('div', { 'class': 'sbll-panel sbll-card' }, [
-						E('h3', {}, '维护动作'),
-						E('div', { 'class': 'sbll-maint' }, [
-							E('div', { 'class': 'sbll-maint-row' }, [
-								E('div', {}, [ E('b', {}, 'Sing-box 日志'), E('span', {}, '来自系统日志 logread，显示 sing-box 相关记录') ]),
-								E('button', { 'class': 'sbll-btn', 'click': function() {
-									activeSource = 'singbox';
-									return cleanCurrentLog();
-								} }, '说明')
-							]),
-							E('div', { 'class': 'sbll-maint-row' }, [
-								E('div', {}, [ E('b', {}, '规则集日志'), E('span', {}, '/tmp/singboxlite-ruleset.log') ]),
-								E('button', { 'class': 'sbll-btn', 'click': function() {
-									return callClearRulesetLog().then(function(res) {
-										ui.addNotification(null, E('p', {}, res.output || '规则集日志已清理'), res.ok ? 'info' : 'error');
-										return refreshLog();
-									});
-								} }, '清理')
-							]),
-							E('div', { 'class': 'sbll-maint-row' }, [
-								E('div', {}, [ E('b', {}, '自动清理'), E('span', {}, '每天 ' + cleanupTime + ' truncate') ]),
-								E('button', { 'class': 'sbll-btn', 'click': function() { return saveLogSettings('已写入自动清理定时任务', true); } }, '设置')
-							])
-						])
-					])
 				])
 			]),
 				E('div', { 'class': 'sbll-footer' }, [
