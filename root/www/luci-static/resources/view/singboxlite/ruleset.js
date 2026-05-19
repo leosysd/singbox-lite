@@ -175,7 +175,7 @@ function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
 		.sblr-page{color:#0f1f35;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
-		.sblr-page>*{max-width:1440px;margin-left:auto;margin-right:auto}
+		.sblr-shell{max-width:1440px;margin:0 auto}
 		.sblr-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
 		.sblr-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;margin-bottom:10px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
 		.sblr-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
@@ -197,7 +197,8 @@ function css() {
 		.sblr-stat-value{font-size:13px;font-weight:900;color:#102038;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 		.sblr-stat-value.ok{color:#008763}.sblr-stat-value.warn{color:#b76b05}
 		.sblr-stat-meta{font-size:11px;color:#7a8ba3;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sblr-grid{display:grid;grid-template-columns:.78fr 1.22fr;gap:10px;align-items:start}
+		.sblr-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
+		.sblr-grid>div{min-width:0}
 		.sblr-card{padding:12px 13px;margin-bottom:10px}
 		.sblr-card>h3,.sblr-subtitle{margin:0 0 10px;font-size:13px;color:#102038}
 		.sblr-box{border:1px solid #dbe3ef;border-radius:7px;background:#fbfcff;padding:11px 12px;margin-bottom:9px}
@@ -258,6 +259,7 @@ return view.extend({
 
 		return E('div', { 'class': 'sblr-page' }, [
 			css(),
+			E('div', { 'class': 'sblr-shell' }, [
 			E('div', { 'class': 'sblr-panel sblr-hero' }, [
 				E('div', { 'class': 'sblr-title' }, [
 					E('h2', {}, '规则集'),
@@ -345,6 +347,7 @@ return view.extend({
 				E('button', { 'class': 'sblr-btn primary', 'click': function() { return saveRuleset('已保存并写入规则集定时任务', true, true); } }, '✓ 保存并写入定时任务'),
 				E('button', { 'class': 'sblr-btn', 'click': function() { return saveRuleset('已保存规则集设置，等待应用', false, false); } }, '保存'),
 				E('button', { 'class': 'sblr-btn danger', 'click': function() { location.reload(); } }, '重置')
+			])
 			])
 		]);
 	},

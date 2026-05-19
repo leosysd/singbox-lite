@@ -272,7 +272,7 @@ function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs:not(.sbl-tabs):not(.sblr-tabs):not(.sbll-tabs){display:none!important}
 		.sbll-page{color:#0f1f35;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
-		.sbll-page>*{max-width:1440px;margin-left:auto;margin-right:auto}
+		.sbll-shell{max-width:1440px;margin:0 auto}
 		.sbll-panel{background:rgba(255,255,255,.97);border:1px solid #d5deeb;border-radius:14px;box-shadow:0 18px 45px rgba(64,91,160,.12)}
 		.sbll-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px 14px;margin-bottom:10px;background:linear-gradient(115deg,#204d76 0,#276be2 62%,#60a4ff 100%);border-color:rgba(255,255,255,.28);color:#fff}
 		.sbll-hero:after{content:"";position:absolute;right:-42px;top:-32px;width:190px;height:190px;border-radius:999px;background:rgba(255,255,255,.12)}
@@ -305,7 +305,7 @@ function css() {
 		.sbll-switchline input:checked+.sbll-switch:before{transform:translateX(15px)}
 		.sbll-input{height:29px;border:1px solid #cbd6e6;border-radius:5px;background:#fff;color:#102038;box-sizing:border-box;padding:0 9px;font-size:12px}
 		.sbll-search{flex:1 1 340px;min-width:240px}
-		.sbll-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:10px;align-items:start}
+		.sbll-main{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
 		.sbll-card{padding:12px 13px;margin-bottom:10px}
 		.sbll-card>h3{margin:0 0 10px;font-size:13px;color:#102038}
 		.sbll-summary{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
@@ -351,6 +351,7 @@ return view.extend({
 
 		page = E('div', { 'class': 'sbll-page', id: 'sbll-page' }, [
 			css(),
+			E('div', { 'class': 'sbll-shell' }, [
 			E('div', { 'class': 'sbll-panel sbll-hero' }, [
 				E('div', { 'class': 'sbll-title' }, [
 					E('h2', {}, '日志中心'),
@@ -443,6 +444,7 @@ return view.extend({
 					E('button', { 'class': 'sbll-btn', 'click': function() { return saveLogSettings('已写入自动清理定时任务', true); } }, '写入自动清理任务'),
 					E('button', { 'class': 'sbll-btn danger', 'click': function() { location.reload(); } }, '重置')
 				])
+			])
 		]);
 
 			window.setTimeout(function() {
