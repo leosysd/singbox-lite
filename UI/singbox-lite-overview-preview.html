@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SingBox Lite UI Preview</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --ink: #12233d;
+      --muted: #65758f;
+      --line: #d9e5f5;
+      --page: #edf5ff;
+      --ok: #0f9f6e;
+      --danger: #ef4444;
+      --warn: #d97706;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, #6070e8 0, #6070e8 94px, var(--page) 94px, #f8fbff 100%);
+    }
+
+    .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar {
+      padding: 26px 22px;
+      background: #fff;
+      border-right: 1px solid #e5edf7;
+      box-shadow: 10px 0 30px rgba(44, 73, 126, .08);
+    }
+    .router-name { color: #6475ee; font-size: 25px; font-weight: 900; margin-bottom: 28px; }
+    .nav-title { color: #94a3b8; font-size: 11px; font-weight: 900; margin: 18px 0 8px; }
+    .nav-item {
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 9px;
+      color: #51627d;
+      font-weight: 800;
+      margin: 4px 0;
+    }
+    .nav-item.active { color: var(--blue); background: var(--blue-soft); box-shadow: inset 3px 0 0 var(--blue); }
+
+    .content { padding: 48px 22px 34px; }
+    .shell { max-width: 1460px; margin: 0 auto; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      background: linear-gradient(115deg, #1f5178 0, #2868dc 62%, #65aaff 100%);
+      border: 1px solid rgba(255, 255, 255, .3);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 24px 55px rgba(58, 93, 166, .18);
+    }
+    .hero:after {
+      content: "";
+      position: absolute;
+      right: -54px;
+      top: -42px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .12);
+    }
+    .hero-head { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 18px; }
+    .product { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .logo { width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.18); display: grid; place-items: center; font-weight: 900; }
+    .product b { display: block; font-size: 13px; }
+    .product span span { display: block; color: rgba(255,255,255,.72); font-size: 11px; }
+    h1 { margin: 0 0 8px; font-size: 20px; line-height: 1.15; }
+    .hero p { max-width: 760px; margin: 0; color: rgba(255,255,255,.84); }
+    .hero-actions, .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .metrics { position: relative; z-index: 1; display: grid; grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 18px; }
+    .metric { background: rgba(255,255,255,.15); border-radius: 12px; padding: 8px 12px; min-height: 44px; }
+    .metric span { display: block; color: rgba(255,255,255,.72); font-size: 10px; margin-bottom: 3px; }
+    .metric b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .tabs {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 12px;
+      margin: 12px 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(64, 91, 160, .10);
+    }
+    .tab {
+      height: 46px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 16px;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      background: transparent;
+      color: #4b6382;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .page { display: none; }
+    .page.active { display: block; }
+    .panel, .action-card, .overview-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 18px 42px rgba(64,91,160,.10);
+    }
+
+    .status-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,.98);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 14px;
+      box-shadow: 0 14px 34px rgba(64,91,160,.09);
+    }
+    .crumb { color: #60728e; font-weight: 800; }
+    .pill { border-radius: 999px; padding: 6px 12px; font-weight: 900; background: #e8fbf1; color: var(--ok); border: 1px solid #bcebd0; }
+
+    .overview-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .overview-item { min-height: 70px; padding: 13px 14px; }
+    .overview-item span { display: block; color: var(--muted); font-weight: 800; margin-bottom: 6px; }
+    .overview-item b { display: block; color: #132845; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .top-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .action-card { min-height: 122px; padding: 16px; }
+    .action-card h3, .panel h3 { margin: 0 0 12px; font-size: 13px; color: #263959; }
+    .action-card p { margin: 0 0 16px; color: var(--muted); min-height: 34px; }
+
+    .main-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+    .panel { padding: 18px; }
+    .settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .section { border: 1px solid var(--line); border-radius: 12px; background: #fbfdff; padding: 14px; }
+    .section h4 { margin: 0 0 10px; font-size: 12px; color: #263959; }
+    .field { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; margin: 8px 0; }
+    .field > span { text-align: right; font-weight: 900; color: #405674; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #cbd8e8;
+      border-radius: 9px;
+      background: #fff;
+      color: #16304f;
+      font: inherit;
+      font-weight: 800;
+    }
+    input { height: 32px; padding: 0 10px; }
+    textarea { min-height: 300px; padding: 12px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.65; }
+    .mode-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .mode { border: 1px solid #cbd8e8; border-radius: 11px; padding: 8px 10px; background: #fff; min-height: 48px; }
+    .mode.active { background: var(--blue-soft); border-color: #8fb4ff; color: var(--blue); }
+    .mode b { display: block; }
+    .mode span { display: block; margin-top: 3px; color: #7387a2; font-size: 11px; }
+    .toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; color: #53677f; }
+    .switch { width: 36px; height: 19px; border-radius: 999px; background: var(--blue); position: relative; display: inline-block; }
+    .switch:before { content: ""; position: absolute; right: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; }
+
+    .btn {
+      min-height: 30px;
+      border: 1px solid #cdddf5;
+      background: #fff;
+      color: var(--blue);
+      padding: 0 13px;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .btn.soft { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.24); color: #fff; }
+    .btn.warn { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+
+    .rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .rule-list { display: grid; gap: 8px; }
+    .rule-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 12px;
+      border: 1px solid #e0e9f7;
+      border-radius: 12px;
+      background: #fbfdff;
+    }
+    .rule-row b { display: block; }
+    .rule-row span { display: block; color: var(--muted); margin-top: 2px; }
+    .tag { padding: 4px 8px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-weight: 900; }
+
+    .log-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .log-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .log-box {
+      min-height: 420px;
+      border: 1px solid #d0dded;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #dbeafe;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      line-height: 1.65;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+    @media (max-width: 1180px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .content { padding: 24px 14px; }
+      .metrics, .top-grid, .overview-strip, .settings, .rules-grid { grid-template-columns: 1fr; }
+      .hero-head, .log-head { flex-direction: column; align-items: flex-start; }
+      .field { grid-template-columns: 96px minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="router-name">X86_N100</div>
+      <div class="nav-title">服务</div>
+      <div class="nav-item">HomeProxy</div>
+      <div class="nav-item">MosDNS</div>
+      <div class="nav-item active">SingBox Lite</div>
+      <div class="nav-item">OpenClash</div>
+      <div class="nav-title">网络</div>
+      <div class="nav-item">接口</div>
+      <div class="nav-item">防火墙</div>
+    </aside>
+
+    <main class="content">
+      <div class="shell">
+        <section class="hero">
+          <div class="hero-head">
+            <div>
+              <div class="product">
+                <div class="logo">SB</div>
+                <span><b>SingBox Lite</b><span>LuCI 控制台</span></span>
+              </div>
+              <h1>清晰、直接的 sing-box 管理面板</h1>
+              <p>总览只放运行和应用相关内容；规则集和日志进入各自页面处理，避免在一个页面里堆所有东西。</p>
+            </div>
+            <div class="hero-actions">
+              <button class="btn soft">检查配置</button>
+              <button class="btn soft" data-open="logs">查看日志</button>
+              <button class="btn primary">保存并应用</button>
+            </div>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span>服务状态</span><b>运行中</b></div>
+            <div class="metric"><span>当前模式</span><b>sing-box + mosdns</b></div>
+            <div class="metric"><span>配置文件</span><b>config.json</b></div>
+            <div class="metric"><span>运行信息</span><b>PID 20560</b></div>
+            <div class="metric"><span>DNS</span><b>MosDNS 联动</b></div>
+          </div>
+        </section>
+
+        <nav class="tabs">
+          <button class="tab active" data-open="overview">总览</button>
+          <button class="tab" data-open="rules">规则集</button>
+          <button class="tab" data-open="logs">日志</button>
+        </nav>
+
+        <section id="page-overview" class="page active">
+          <div class="status-strip">
+            <div class="crumb">当前页面：总览 · 保存并应用会拉取远程配置并检查后写入</div>
+            <div class="pill">已启用</div>
+          </div>
+
+          <section class="overview-strip">
+            <div class="overview-item"><span>sing-box 版本</span><b>1.14.0-alpha.24</b></div>
+            <div class="overview-item"><span>PID</span><b>20560</b></div>
+            <div class="overview-item"><span>MosDNS</span><b>running</b></div>
+            <div class="overview-item"><span>日志大小</span><b>0 B</b></div>
+            <div class="overview-item"><span>上次检查</span><b>pass</b></div>
+            <div class="overview-item"><span>上次应用</span><b>2026-05-19 05:21:51</b></div>
+          </section>
+
+          <section class="top-grid">
+            <div class="action-card">
+              <h3>配置操作</h3>
+              <p>保存基础设置，或者拉取远程配置并完整应用。</p>
+              <div class="btn-row"><button class="btn">仅保存</button><button class="btn primary">保存并应用</button></div>
+            </div>
+            <div class="action-card">
+              <h3>服务操作</h3>
+              <p>临时启动、停止或重启 sing-box，不改配置内容。</p>
+              <div class="btn-row"><button class="btn primary">启动</button><button class="btn danger">停止</button><button class="btn">重启</button></div>
+            </div>
+            <div class="action-card">
+              <h3>MosDNS 联动</h3>
+              <p>当前 DNS 由 MosDNS 接管，sing-box 启动前等待 MosDNS 就绪。</p>
+              <div class="btn-row"><button class="btn primary">重启 MosDNS</button></div>
+            </div>
+            <div class="action-card">
+              <h3>备份</h3>
+              <p>手动备份正式配置，或者清理历史备份。</p>
+              <div class="btn-row"><button class="btn">备份</button><button class="btn danger">删备份</button></div>
+            </div>
+          </section>
+
+          <section class="main-grid">
+            <div class="panel">
+              <h3>运行与远程设置</h3>
+              <div class="settings">
+                <div class="section">
+                  <h4>远程配置</h4>
+                  <label class="field"><span>运行模式</span><div class="mode-choice"><div class="mode active"><b>sing-box + mosdns</b><span>开启 MosDNS DNS 转发</span></div><div class="mode"><b>sing-box</b><span>关闭 MosDNS 转发</span></div></div></label>
+                  <label class="field"><span>远程 URL</span><input value="https://asd.tongtgrt.top:2096/sub/..."></label>
+                  <label class="field"><span>自动更新</span><span class="toggle"><i class="switch"></i>每天 03:00</span></label>
+                  <label class="field"><span>检查后应用</span><span class="toggle"><i class="switch"></i>启用</span></label>
+                </div>
+                <div class="section">
+                  <h4>MosDNS</h4>
+                  <label class="field"><span>地址</span><input value="127.0.0.1"></label>
+                  <label class="field"><span>端口</span><input value="5335"></label>
+                  <label class="field"><span>禁用劫持</span><span class="toggle"><i class="switch"></i>启用</span></label>
+                  <label class="field"><span>重启 MosDNS</span><span class="toggle"><i class="switch"></i>应用时重启</span></label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="footer">
+            <button class="btn primary">保存并应用</button>
+            <button class="btn">保存</button>
+            <button class="btn danger">重置</button>
+          </div>
+        </section>
+
+        <section id="page-rules" class="page">
+          <div class="status-strip">
+            <div class="crumb">当前页面：规则集 · 更新 sing-box SRS 和 MosDNS TXT 规则</div>
+            <div class="pill">每周二 07:45</div>
+          </div>
+          <div class="rules-grid">
+            <div class="panel">
+              <h3>规则源</h3>
+              <div class="rule-list">
+                <div class="rule-row"><div><b>GeoSite</b><span>dist/geosite/*.srs + mosdns txt</span></div><span class="tag">启用</span><button class="btn">更新</button></div>
+                <div class="rule-row"><div><b>GeoIP</b><span>dist/geoip/*.srs</span></div><span class="tag">启用</span><button class="btn">更新</button></div>
+                <div class="rule-row"><div><b>MosDNS 规则</b><span>/etc/mosdns/rule</span></div><span class="tag">同步</span><button class="btn">打开</button></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>更新设置</h3>
+              <div class="settings">
+                <div class="section">
+                  <h4>自动更新</h4>
+                  <label class="field"><span>状态</span><span class="toggle"><i class="switch"></i>启用</span></label>
+                  <label class="field"><span>时间</span><input value="每周二 07:45"></label>
+                  <label class="field"><span>失败处理</span><input value="下载失败时保留旧规则"></label>
+                </div>
+                <div class="section">
+                  <h4>更新后动作</h4>
+                  <label class="field"><span>sing-box</span><span class="toggle"><i class="switch"></i>不重启</span></label>
+                  <label class="field"><span>MosDNS</span><span class="toggle"><i class="switch"></i>运行中才重启</span></label>
+                  <label class="field"><span>等待</span><input value="3 秒后检查服务状态"></label>
+                </div>
+              </div>
+              <div class="footer">
+                <button class="btn primary">更新全部规则</button>
+                <button class="btn">保存规则设置</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="page-logs" class="page">
+          <div class="status-strip">
+            <div class="crumb">当前页面：日志 · 读取最近 sing-box / MosDNS 相关日志</div>
+            <div class="pill">自动刷新关闭</div>
+          </div>
+          <div class="panel">
+            <div class="log-head">
+              <h3>运行日志</h3>
+              <div class="log-controls">
+                <button class="btn primary">刷新</button>
+                <button class="btn">自动刷新</button>
+                <button class="btn warn">清空日志</button>
+                <input style="width: 110px" value="500 行">
+              </div>
+            </div>
+            <div class="log-box">2026-05-19 05:21:51 sing-box started
+2026-05-19 05:21:52 mosdns running at 127.0.0.1:5335
+2026-05-19 05:21:54 dns probe pass: github.com
+2026-05-19 05:22:10 route ready
+
+这里是日志页预览，正式版会读取路由器上的实际日志。</div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function openPage(name) {
+      document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.open === name);
+      });
+      document.querySelectorAll('.page').forEach(function(page) {
+        page.classList.toggle('active', page.id === 'page-' + name);
+      });
+    }
+
+    document.querySelectorAll('[data-open]').forEach(function(node) {
+      node.addEventListener('click', function() {
+        openPage(node.dataset.open);
+      });
+    });
+  </script>
+</body>
+</html>

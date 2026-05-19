@@ -133,8 +133,8 @@ function saveSettings(message, applyCron, applyNow) {
 			mosdns_port: val('sbl-mosdns-port') || '5335',
 			disable_dns_hijack: yes('sbl-disable-dns-hijack'),
 			restart_mosdns: yes('sbl-restart-mosdns'),
-			clean_log: yes('sbl-clean-log'),
-			tail_lines: val('sbl-tail-lines') || '200'
+			clean_log: document.getElementById('sbl-clean-log') ? yes('sbl-clean-log') : (uci.get('singboxlite', 'log', 'cleanup_enabled') || '0'),
+			tail_lines: val('sbl-tail-lines') || uci.get('singboxlite', 'log', 'tail_lines') || '200'
 		}).then(function() {
 		if (applyCron)
 			return callSetCron();
@@ -192,6 +192,13 @@ function operationCard(title, body, nodes) {
 	]);
 }
 
+function overviewItem(label, value) {
+	return E('div', { 'class': 'sbl-overview-item' }, [
+		E('span', {}, label),
+		E('b', {}, value || '-')
+	]);
+}
+
 function css() {
 	return E('style', {}, `
 		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:48px 18px 28px;background:linear-gradient(180deg,#5f70e8 0,#5f70e8 92px,#eaf2ff 92px,#f7fbff 100%);min-height:calc(100vh - 110px)}
@@ -216,22 +223,18 @@ function css() {
 		.sbl-hero-metric{min-height:40px;border-radius:12px;background:rgba(255,255,255,.15);padding:7px 12px;box-sizing:border-box;overflow:hidden}
 		.sbl-hero-metric span{display:block;font-size:10px;color:rgba(255,255,255,.72);margin-bottom:3px}
 		.sbl-hero-metric b{display:block;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbl-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;margin-bottom:10px}
-		.sbl-tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-		.sbl-tab{border:1px solid #d7e4f5;background:#fff;color:#55708f;border-radius:999px;padding:7px 16px;font-weight:900;cursor:pointer}
-		.sbl-tab.active{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 8px 18px rgba(37,99,235,.22)}
-		.sbl-enabled{display:inline-flex;align-items:center;border-radius:999px;background:#e8fbf0;color:#07905f;border:1px solid #bceacf;padding:6px 12px;font-weight:900}
-		.sbl-dashboard{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:start}
-		.sbl-side{padding:14px;min-height:520px}
-		.sbl-side h3,.sbl-card>h3,.sbl-op-card h3{margin:0 0 12px;font-size:13px;color:#263959}
-		.sbl-policy{border:1px solid #dce7f6;border-radius:12px;padding:11px 12px;margin-bottom:8px;background:linear-gradient(180deg,#fff,#f8fbff)}
-		.sbl-policy b{display:block;color:#243b61;font-size:12px}.sbl-policy span{display:block;color:#70849f;font-size:11px;margin-top:4px}
-		.sbl-policy.active{border-color:#bdd3ff;background:#f4f8ff}
+		.sbl-status-strip{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0;background:rgba(255,255,255,.98);border:1px solid #d8e4f5;border-radius:14px;padding:10px 14px;box-shadow:0 14px 34px rgba(64,91,160,.09)}
+		.sbl-crumb{color:#60728e;font-weight:800}
+		.sbl-enabled{display:inline-flex;align-items:center;border-radius:999px;background:#e8fbf0;color:#07905f;border:1px solid #bceacf;padding:6px 12px;font-weight:900;white-space:nowrap}
+		.sbl-overview-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:12px}
+		.sbl-overview-item{min-height:70px;background:#fff;border:1px solid #d8e4f5;border-radius:14px;padding:13px 14px;box-shadow:0 14px 34px rgba(64,91,160,.08);overflow:hidden}
+		.sbl-overview-item span{display:block;color:#65758f;font-weight:800;margin-bottom:6px}
+		.sbl-overview-item b{display:block;color:#132845;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 		.sbl-main{display:grid;gap:12px}
 		.sbl-op-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 		.sbl-op-card{min-height:116px;border:1px solid #d8e4f5;border-radius:14px;background:#fff;padding:15px;box-sizing:border-box}
 		.sbl-op-card p{margin:0 0 16px;color:#70849f;line-height:1.45;min-height:32px}
-		.sbl-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(360px,.88fr);gap:12px;align-items:start}
+		.sbl-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 		.sbl-card{padding:16px;margin-bottom:12px}
 		.sbl-chip-row{display:flex;align-items:center;gap:8px}
 		.sbl-chip{display:inline-flex;align-items:center;min-height:21px;border-radius:999px;padding:0 9px;font-size:11px;font-weight:900;background:#eafaf2;color:#008763}
@@ -258,13 +261,9 @@ function css() {
 		.sbl-meta-list{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
 		.sbl-meta{display:flex;justify-content:space-between;border-bottom:1px solid #e4eaf2;padding:8px 0;gap:12px}
 		.sbl-meta span{color:#5f7088}.sbl-meta b{color:#102038;text-align:right}
-		.sbl-flow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-		.sbl-flow-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e4eaf2;border-radius:6px;padding:9px;color:#5f7088;background:#fbfdff}
-		.sbl-flow-row b{display:block;color:#102038;margin-bottom:2px}.sbl-flow-row span:last-child{font-size:11px;color:#4f62df;font-weight:800}
-		.sbl-step{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:#eef2ff;color:#4f62df;font-weight:900}
 		.sbl-footer{justify-content:flex-end;margin-top:2px}
-		@media(max-width:1280px){.sbl-dashboard,.sbl-grid{grid-template-columns:1fr}.sbl-side{min-height:0}.sbl-op-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-hero-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
-		@media(max-width:900px){.sbl-settings,.sbl-flow,.sbl-meta-list,.sbl-op-grid{grid-template-columns:1fr}.sbl-hero-top,.sbl-nav{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:104px minmax(0,1fr)}}
+		@media(max-width:1280px){.sbl-grid{grid-template-columns:1fr}.sbl-op-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-hero-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sbl-overview-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
+		@media(max-width:900px){.sbl-settings,.sbl-meta-list,.sbl-op-grid,.sbl-overview-strip{grid-template-columns:1fr}.sbl-hero-top,.sbl-status-strip{align-items:flex-start;flex-direction:column}.sbl-actions{justify-content:flex-start}.sbl-field{grid-template-columns:104px minmax(0,1fr)}}
 		`);
 }
 
@@ -332,114 +331,73 @@ return view.extend({
 						heroMetric('DNS / 规则', activeMode === 'singbox_mosdns' ? 'MosDNS 联动' : 'sing-box 接管')
 					])
 				]),
-				E('div', { 'class': 'sbl-panel sbl-nav' }, [
-					E('div', { 'class': 'sbl-tabs' }, [
-						E('span', { 'class': 'sbl-tab active' }, '总览'),
-						E('span', { 'class': 'sbl-tab' }, '配置'),
-						E('span', { 'class': 'sbl-tab', 'click': function() { location.href = L.url('admin/services/singboxlite/logs'); } }, '日志'),
-						E('span', { 'class': 'sbl-tab', 'click': function() { location.href = L.url('admin/services/singboxlite/ruleset'); } }, '规则集')
-					]),
+				E('div', { 'class': 'sbl-status-strip' }, [
+					E('div', { 'class': 'sbl-crumb' }, '当前页面：总览 · 保存并应用会拉取远程配置并检查后写入'),
 					E('span', { 'class': 'sbl-enabled' }, status.singbox_running ? '已启用' : '未运行')
 				]),
-				E('div', { 'class': 'sbl-dashboard' }, [
-					E('aside', { 'class': 'sbl-panel sbl-side' }, [
-						E('h3', {}, '策略标签'),
-						E('div', { 'class': 'sbl-policy active' }, [ E('b', {}, 'proxy'), E('span', {}, '默认出口 · auto') ]),
-						E('div', { 'class': 'sbl-policy' }, [ E('b', {}, 'dns'), E('span', {}, activeMode === 'singbox_mosdns' ? 'MosDNS · ' + mosdnsAddr + ':' + mosdnsPort : 'sing-box 接管') ]),
-						E('div', { 'class': 'sbl-policy' }, [ E('b', {}, 'mode'), E('span', {}, modeText(mode)) ]),
-						E('div', { 'class': 'sbl-policy' }, [ E('b', {}, 'rollback'), E('span', {}, '失败回滚，成功删除临时备份') ])
-					]),
-					E('main', { 'class': 'sbl-main' }, [
-						E('div', { 'class': 'sbl-op-grid' }, [
-							operationCard('配置操作', '远程配置会先拉取并检查，通过后再写入正式配置。', [
-								E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '仅保存'),
-								E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用')
-							]),
-							operationCard('服务操作', '用于临时处理 sing-box 服务状态，不改动配置内容。', [
-								E('button', { 'class': 'sbl-btn primary', 'click': function() { return callStartSingbox().then(function(res) { notify('启动 sing-box', res); }); } }, '启动'),
-								E('button', { 'class': 'sbl-btn danger', 'click': function() { return callStopSingbox().then(function(res) { notify('停止 sing-box', res); }); } }, '停止'),
-								E('button', { 'class': 'sbl-btn', 'click': function() { return callRestartSingbox().then(function(res) { notify('重启 sing-box', res); }); } }, '重启')
-							]),
-							operationCard('MosDNS 联动', dnsMeta, [
-								E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '重启 MosDNS')
-							]),
-							operationCard('维护', '备份和日志都在这里做一次性操作。', [
-								E('button', { 'class': 'sbl-btn', 'click': function() { return callBackup().then(function(res) { notify('备份配置', res); }); } }, '备份'),
-								E('button', { 'class': 'sbl-btn danger', 'click': function() {
-									return ui.showModal('确认删除备份', [
-										E('p', {}, '确定要删除 SingBox Lite 创建的配置备份吗？'),
-										E('div', { 'class': 'right' }, [
-											E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
-											E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
-												ui.hideModal();
-												return callDeleteBackups().then(function(res) { notify('删除备份', res); });
-											} }, '删除')
-										])
-									]);
-								} }, '删备份')
-							])
+				E('div', { 'class': 'sbl-overview-strip' }, [
+					overviewItem('sing-box 版本', (status.singbox_version || '-').replace(/^sing-box version /, '').replace(/^sing-box /, '')),
+					overviewItem('PID', status.singbox_pid || '-'),
+					overviewItem('MosDNS', status.mosdns_running ? 'running' : 'not running'),
+					overviewItem('日志大小', '%1024.2mB'.format(status.log_size || 0)),
+					overviewItem('上次检查', status.last_check_result || '-'),
+					overviewItem('上次应用', status.last_apply_time || '-')
+				]),
+				E('div', { 'class': 'sbl-main' }, [
+					E('div', { 'class': 'sbl-op-grid' }, [
+						operationCard('配置操作', '保存基础设置，或者拉取远程配置并完整应用。', [
+							E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '仅保存'),
+							E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用')
 						]),
-						E('div', { 'class': 'sbl-grid' }, [
-							E('div', { 'class': 'sbl-panel sbl-card' }, [
-								E('h3', {}, '运行与远程设置'),
-								E('div', { 'class': 'sbl-settings' }, [
-									E('div', { 'class': 'sbl-section' }, [
-										E('h4', {}, '基础信息'),
-										field('配置路径', input('sbl-config-path', configPath)),
-										field('日志路径', input('sbl-log-path', logPath))
-									]),
-									E('div', { 'class': 'sbl-section' }, [
-										E('h4', {}, '远程配置'),
-										field('运行模式', modePicker(mode)),
-										field('远程 URL', input('sbl-remote-url', remoteUrl, 'https://example.com/sing-box.json')),
-										field('自动更新', toggle('sbl-remote-auto', remoteAuto, '每天 ' + remoteTime)),
-										field('检查后应用', toggle('sbl-remote-apply', remoteApply, '启用'))
-									]),
-									E('div', { 'class': 'sbl-section' }, [
-										E('h4', {}, 'MosDNS'),
-										field('地址', input('sbl-mosdns-addr', mosdnsAddr)),
-										field('端口', input('sbl-mosdns-port', mosdnsPort)),
-										field('禁用劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
-										field('重启 MosDNS', toggle('sbl-restart-mosdns', restartMosdns, restartMosdns ? '应用时重启' : '仅写入配置'))
-									]),
-									E('div', { 'class': 'sbl-section' }, [
-										E('h4', {}, '维护'),
-										field('清理日志', toggle('sbl-clean-log', uci.get('singboxlite', 'log', 'cleanup_enabled') === '1', '每天 ' + cleanupTime)),
-										field('显示行数', input('sbl-tail-lines', uci.get('singboxlite', 'log', 'tail_lines') || '200')),
-										field('备份策略', E('span', { 'class': 'sbl-muted' }, '应用前临时备份，成功后自动删除'))
-									])
-								])
-							]),
-							E('div', {}, [
-								E('div', { 'class': 'sbl-panel sbl-card' }, [
-									E('h3', {}, '运行概况'),
-									E('div', { 'class': 'sbl-meta-list' }, [
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, 'sing-box 版本'), E('b', {}, (status.singbox_version || '-').replace(/^sing-box version /, '')) ]),
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, 'PID'), E('b', {}, status.singbox_pid || '-') ]),
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, 'MosDNS'), E('b', {}, status.mosdns_running ? 'running' : 'not running') ]),
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, '日志大小'), E('b', {}, '%1024.2mB'.format(status.log_size || 0)) ]),
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, '上次检查'), E('b', {}, status.last_check_result || '-') ]),
-										E('div', { 'class': 'sbl-meta' }, [ E('span', {}, '上次应用'), E('b', {}, status.last_apply_time || '-') ])
-									])
-								]),
-								E('div', { 'class': 'sbl-panel sbl-card' }, [
-									E('h3', {}, '应用流程'),
-									E('div', { 'class': 'sbl-flow' }, [
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '1'), E('div', {}, [ E('b', {}, '拉取远程配置'), E('span', {}, '保存并应用时自动下载 URL') ]), E('span', {}, 'fetch') ]),
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '2'), E('div', {}, [ E('b', {}, '预检配置'), E('span', {}, 'JSON 有效并通过 sing-box check') ]), E('span', {}, 'check') ]),
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '3'), E('div', {}, [ E('b', {}, '临时回滚备份'), E('span', {}, '失败回滚，成功后自动删除') ]), E('span', {}, 'backup') ]),
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '4'), E('div', {}, [ E('b', {}, '写入正式配置'), E('span', {}, '同时处理 MosDNS/dnsmasq 联动') ]), E('span', {}, 'apply') ]),
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '5'), E('div', {}, [ E('b', {}, '启动相关服务'), E('span', {}, 'MosDNS 模式先等 10 秒再启动 sing-box') ]), E('span', {}, 'restart') ]),
-										E('div', { 'class': 'sbl-flow-row' }, [ E('span', { 'class': 'sbl-step' }, '6'), E('div', {}, [ E('b', {}, 'DNS 探测'), E('span', {}, '失败会自动回滚，避免保持断网状态') ]), E('span', {}, 'probe') ])
-									])
-								])
-							])
+						operationCard('服务操作', '临时启动、停止或重启 sing-box，不改配置内容。', [
+							E('button', { 'class': 'sbl-btn primary', 'click': function() { return callStartSingbox().then(function(res) { notify('启动 sing-box', res); }); } }, '启动'),
+							E('button', { 'class': 'sbl-btn danger', 'click': function() { return callStopSingbox().then(function(res) { notify('停止 sing-box', res); }); } }, '停止'),
+							E('button', { 'class': 'sbl-btn', 'click': function() { return callRestartSingbox().then(function(res) { notify('重启 sing-box', res); }); } }, '重启')
 						]),
-						E('div', { 'class': 'sbl-footer' }, [
-							E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用'),
-							E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '保存'),
-							E('button', { 'class': 'sbl-btn danger', 'click': function() { location.reload(); } }, '重置')
+						operationCard('MosDNS 联动', dnsMeta, [
+							E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '重启 MosDNS')
+						]),
+						operationCard('备份', '手动备份正式配置，或者清理历史备份。', [
+							E('button', { 'class': 'sbl-btn', 'click': function() { return callBackup().then(function(res) { notify('备份配置', res); }); } }, '备份'),
+							E('button', { 'class': 'sbl-btn danger', 'click': function() {
+								return ui.showModal('确认删除备份', [
+									E('p', {}, '确定要删除 SingBox Lite 创建的配置备份吗？'),
+									E('div', { 'class': 'right' }, [
+										E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
+										E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
+											ui.hideModal();
+											return callDeleteBackups().then(function(res) { notify('删除备份', res); });
+										} }, '删除')
+									])
+								]);
+							} }, '删备份')
 						])
+					]),
+					E('div', { 'class': 'sbl-grid' }, [
+						E('div', { 'class': 'sbl-panel sbl-card' }, [
+							E('h3', {}, '运行与远程设置'),
+							E('div', { 'class': 'sbl-settings' }, [
+								E('div', { 'class': 'sbl-section' }, [
+									E('h4', {}, '远程配置'),
+									field('运行模式', modePicker(mode)),
+									field('远程 URL', input('sbl-remote-url', remoteUrl, 'https://example.com/sing-box.json')),
+									field('自动更新', toggle('sbl-remote-auto', remoteAuto, '每天 ' + remoteTime)),
+									field('检查后应用', toggle('sbl-remote-apply', remoteApply, '启用'))
+								]),
+								E('div', { 'class': 'sbl-section' }, [
+									E('h4', {}, 'MosDNS'),
+									field('地址', input('sbl-mosdns-addr', mosdnsAddr)),
+									field('端口', input('sbl-mosdns-port', mosdnsPort)),
+									field('禁用劫持', toggle('sbl-disable-dns-hijack', disableDnsHijack, '启用')),
+									field('重启 MosDNS', toggle('sbl-restart-mosdns', restartMosdns, restartMosdns ? '应用时重启' : '仅写入配置'))
+								])
+							])
+						])
+					]),
+					E('div', { 'class': 'sbl-footer' }, [
+						E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用'),
+						E('button', { 'class': 'sbl-btn', 'click': function() { return saveSettings('已保存设置，等待应用', false, false); } }, '保存'),
+						E('button', { 'class': 'sbl-btn danger', 'click': function() { location.reload(); } }, '重置')
 					])
 				])
 			])
