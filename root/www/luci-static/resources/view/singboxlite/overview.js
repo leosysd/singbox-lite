@@ -24,6 +24,8 @@ var callUpdateRuleset = rpc.declare({ object: 'luci.singboxlite', method: 'updat
 var callRulesetStatus = rpc.declare({ object: 'luci.singboxlite', method: 'ruleset_status', expect: { '': {} } });
 var callTailSourceLog = rpc.declare({ object: 'luci.singboxlite', method: 'tail_source_log', params: [ 'source', 'lines' ], expect: { '': {} } });
 var callClearRulesetLog = rpc.declare({ object: 'luci.singboxlite', method: 'clear_ruleset_log', expect: { '': {} } });
+var callCheckCoreUpdate = rpc.declare({ object: 'luci.singboxlite', method: 'check_core_update', params: [ 'include_prerelease' ], expect: { '': {} } });
+var callUpdateCore = rpc.declare({ object: 'luci.singboxlite', method: 'update_core', params: [ 'include_prerelease' ], expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
 
 var WEEKDAYS = [
@@ -223,6 +225,82 @@ function operationCard(title, body, nodes) {
 		E('h3', {}, title),
 		body ? E('p', {}, body) : '',
 		E('div', { 'class': 'sbl-op-actions' }, nodes || [])
+	]);
+}
+
+function versionShort(value) {
+	return (value || '-').replace(/^sing-box version /, '').replace(/^sing-box /, '');
+}
+
+function coreIncludeChecked(status) {
+	if (status.core_include_prerelease === '1')
+		return true;
+	if (status.core_include_prerelease === '0')
+		return false;
+	return /alpha|beta|rc/i.test(status.singbox_version || '');
+}
+
+function updateCoreText(res) {
+	if (!res)
+		return;
+
+	updateText('sbl-core-current', versionShort(res.current_version || ''));
+	updateText('sbl-core-latest', res.latest_version || '-');
+	updateText('sbl-core-check', res.last_check_time || '-');
+	updateText('sbl-core-update', res.last_update_time || '-');
+}
+
+function checkCoreUpdate() {
+	var include = yes('sbl-core-pre');
+
+	return callCheckCoreUpdate(include).then(function(res) {
+		notify('检查 sing-box 核心', res);
+		updateCoreText(res);
+		return res;
+	});
+}
+
+function updateCore() {
+	var include = yes('sbl-core-pre');
+
+	ui.addNotification(null, E('p', {}, '开始更新 sing-box 核心。完成替换后会等待 10 秒并自动重启 sing-box。'), 'info');
+
+	return callUpdateCore(include).then(function(res) {
+		notify('更新 sing-box 核心', res);
+		updateCoreText(res);
+		window.setTimeout(function() { location.reload(); }, 1800);
+		return res;
+	}).catch(function(e) {
+		if (isTimeoutError(e)) {
+			ui.addNotification(null, E('p', {}, '核心更新可能仍在执行，页面将在 20 秒后刷新状态。'), 'info');
+			window.setTimeout(function() { location.reload(); }, 20000);
+			return;
+		}
+		if (e)
+			L.error(e);
+	});
+}
+
+function coreUpdateCard(status) {
+	var current = versionShort(status.singbox_version || '-');
+	var latest = status.core_latest_version || '-';
+	var include = coreIncludeChecked(status);
+
+	return E('div', { 'class': 'sbl-op-card sbl-core-card' }, [
+		E('h3', {}, 'Sing-box 核心'),
+		E('div', { 'class': 'sbl-op-actions' }, [
+			E('button', { 'class': 'sbl-btn', 'click': checkCoreUpdate }, '检查更新'),
+			E('button', { 'class': 'sbl-btn', 'click': updateCore }, '更新核心')
+		]),
+		E('label', { 'class': 'sbl-toggle sbl-core-toggle' }, [
+			E('input', { id: 'sbl-core-pre', type: 'checkbox', checked: include ? true : null }),
+			E('span', { 'class': 'sbl-switch' }),
+			E('b', {}, '包含 Alpha/Beta 版本')
+		]),
+		E('div', { 'class': 'sbl-core-meta' }, [
+			E('div', {}, [ '当前版本：', E('span', { id: 'sbl-core-current' }, current) ]),
+			E('div', {}, [ '最新版本：', E('span', { id: 'sbl-core-latest' }, latest) ])
+		])
 	]);
 }
 
@@ -631,9 +709,7 @@ function renderOverviewPanel(status) {
 				operationCard('MosDNS 联动', dnsMeta, [
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '重启 MosDNS')
 				]),
-				operationCard('sing-box 更新注意', '更新核心前确认架构和版本，Alpha/Beta 可能不稳定；更新后需要重启 sing-box。', [
-					E('button', { 'class': 'sbl-btn', 'click': function() { return callCheckCurrent().then(function(res) { notify('更新前检查', res); }); } }, '检查配置')
-				]),
+				coreUpdateCard(status),
 				operationCard('Clash API', '打开 sing-box 的 Clash 控制面板，地址使用当前路由器 IP 与 9090 端口。', [
 					E('button', { 'class': 'sbl-btn primary', 'click': openClashPanel }, '打开面板')
 				])
@@ -845,7 +921,7 @@ function css() {
 		.sbl-overview-strip,.sbl-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:8px}.sbl-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
 		.sbl-overview-item,.sbl-stat{min-height:54px;background:#fff;border:1px solid #d8e4f5;border-radius:10px;padding:9px 11px;box-shadow:0 12px 28px rgba(64,91,160,.07);overflow:hidden;box-sizing:border-box}
 		.sbl-overview-item span,.sbl-stat-label{display:block;color:#65758f;font-weight:800;margin-bottom:4px;font-size:11px}.sbl-overview-item b,.sbl-stat-value{display:block;color:#132845;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbl-stat-value.ok{color:#008763}.sbl-stat-value.warn{color:#b76b05}.sbl-stat-value.danger{color:#dc2947}.sbl-stat-meta{font-size:11px;color:#7a8ba3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-		.sbl-main{display:grid;gap:10px}.sbl-op-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.sbl-op-card{min-height:112px;border:1px solid #d8e4f5;border-radius:10px;background:#fff;padding:13px;box-sizing:border-box}.sbl-op-card h3,.sbl-card>h3{margin:0 0 8px;font-size:14px;color:#263959}.sbl-op-card p{margin:0 0 14px;color:#70849f;line-height:1.45;min-height:32px}
+		.sbl-main{display:grid;gap:10px}.sbl-op-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.sbl-op-card{min-height:112px;border:1px solid #d8e4f5;border-radius:10px;background:#fff;padding:13px;box-sizing:border-box}.sbl-op-card h3,.sbl-card>h3{margin:0 0 8px;font-size:14px;color:#263959}.sbl-op-card p{margin:0 0 14px;color:#70849f;line-height:1.45;min-height:32px}.sbl-core-card .sbl-op-actions{margin:10px 0 8px}.sbl-core-toggle{margin:2px 0 8px}.sbl-core-meta{color:#5f7088;font-size:12px;line-height:1.35}.sbl-core-meta span{color:#263959;font-weight:800}
 		.sbl-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}.sbl-card{padding:12px;margin-bottom:8px}.sbl-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sbl-section{border:1px solid #dce7f6;border-radius:10px;padding:10px;background:#fbfdff}.sbl-section.compact{padding:8px 10px;margin-bottom:8px}.sbl-section h4{margin:0 0 6px;font-size:12px;color:#263959}
 		.sbl-field{display:grid;grid-template-columns:108px minmax(0,1fr);align-items:center;gap:8px;margin:6px 0}.sbl-field>span{font-weight:800;color:#425672;text-align:right}.sbl-input{height:29px;border:1px solid #cbd8e8;border-radius:8px;background:#fff;color:#102038;box-sizing:border-box;padding:0 9px;width:100%;font-size:12px}.sbl-small-input{width:auto;min-width:118px}.sbl-search{flex:1 1 340px;min-width:240px}
 		.sbl-mode-picker,.sbl-two{display:grid;grid-template-columns:1fr 1fr;gap:7px}.sbl-mode-btn{min-height:44px;border:1px solid #cbd8e8;border-radius:10px;background:#fff;color:#102038;padding:7px 10px;text-align:left;cursor:pointer}.sbl-mode-btn b{display:block;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbl-mode-btn span{display:block;margin-top:3px;color:#7a8ba3;font-size:11px;line-height:1.2}.sbl-mode-btn.active{border-color:#8fb4ff;background:#eef5ff;color:#2563eb}.sbl-mode-btn.active span{color:#2563eb}

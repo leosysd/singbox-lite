@@ -25,6 +25,7 @@ const MOSDNS_PREPARE = '/usr/share/singboxlite/prepare-mosdns-config.uc';
 const SINGBOX_PREPARE = '/usr/share/singboxlite/prepare-singbox-config.uc';
 const RULESET_UPDATER = '/usr/share/singboxlite/update-geosite-rules.sh';
 const RULESET_LOG = '/tmp/singboxlite-ruleset.log';
+const CORE_UPDATER = '/usr/share/singboxlite/update-singbox-core.sh';
 
 function trim_text(value) {
 	return replace(value || '', /^\s+|\s+$/g, '');
@@ -802,7 +803,7 @@ function tail_source_log(source, lines) {
 	}
 
 	if (source == 'app') {
-		let cmd = 'for f in /tmp/singboxlite-ruleset.log /tmp/singboxlite-update.log /tmp/singboxlite-check.log /tmp/singboxlite-prepare.log; do [ -f "$f" ] && { echo "===== $f ====="; tail -n ' + lines + ' "$f"; }; done';
+		let cmd = 'for f in /tmp/singboxlite-core.log /tmp/singboxlite-ruleset.log /tmp/singboxlite-update.log /tmp/singboxlite-check.log /tmp/singboxlite-prepare.log; do [ -f "$f" ] && { echo "===== $f ====="; tail -n ' + lines + ' "$f"; }; done';
 		let res = exec_cmd(cmd);
 		return { ok: true, source: source, log: res.stdout, size: length(res.stdout || '') };
 	}
@@ -958,6 +959,46 @@ function clear_ruleset_log() {
 	return { ok: res.code === 0, output: res.stdout || '规则集更新日志已清理' };
 }
 
+function core_include_arg(include_prerelease) {
+	return include_prerelease == '1' || include_prerelease == true ? '1' : '0';
+}
+
+function check_core_update(include_prerelease) {
+	if (stat(CORE_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少核心更新脚本：' + CORE_UPDATER };
+
+	let include = core_include_arg(include_prerelease);
+	let res = exec_cmd(shellquote(CORE_UPDATER) + ' check ' + include);
+	return {
+		ok: res.code === 0,
+		output: res.stdout || (res.code === 0 ? '核心更新检查完成' : '核心更新检查失败'),
+		current_version: singbox_version(),
+		latest_version: cfg('core', 'latest_version', ''),
+		last_check_time: cfg('core', 'last_check_time', ''),
+		last_check_result: cfg('core', 'last_check_result', ''),
+		arch: cfg('core', 'arch', ''),
+		download_url: cfg('core', 'download_url', '')
+	};
+}
+
+function update_core(include_prerelease) {
+	if (stat(CORE_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少核心更新脚本：' + CORE_UPDATER };
+
+	let include = core_include_arg(include_prerelease);
+	let res = exec_cmd(shellquote(CORE_UPDATER) + ' update ' + include);
+	return {
+		ok: res.code === 0,
+		output: res.stdout || (res.code === 0 ? '核心更新完成' : '核心更新失败'),
+		current_version: singbox_version(),
+		latest_version: cfg('core', 'latest_version', ''),
+		last_update_time: cfg('core', 'last_update_time', ''),
+		last_update_result: cfg('core', 'last_update_result', ''),
+		arch: cfg('core', 'arch', ''),
+		download_url: cfg('core', 'download_url', '')
+	};
+}
+
 const methods = {
 	status: {
 		call: function() {
@@ -984,7 +1025,15 @@ const methods = {
 				ruleset_singbox_dir: safe_path(cfg('ruleset', 'singbox_dir', '/etc/sing-box/rule-set'), '/etc/sing-box/rule-set', /^\/etc\/sing-box\/[^\n]+$/),
 				ruleset_mosdns_dir: safe_path(cfg('ruleset', 'mosdns_dir', '/etc/mosdns/rule'), '/etc/mosdns/rule', /^\/etc\/mosdns\/[^\n]+$/),
 				ruleset_last_update_time: cfg('ruleset', 'last_update_time', ''),
-				ruleset_last_update_result: cfg('ruleset', 'last_update_result', '')
+				ruleset_last_update_result: cfg('ruleset', 'last_update_result', ''),
+				core_include_prerelease: cfg('core', 'include_prerelease', ''),
+				core_latest_version: cfg('core', 'latest_version', ''),
+				core_last_check_time: cfg('core', 'last_check_time', ''),
+				core_last_check_result: cfg('core', 'last_check_result', ''),
+				core_last_update_time: cfg('core', 'last_update_time', ''),
+				core_last_update_result: cfg('core', 'last_update_result', ''),
+				core_arch: cfg('core', 'arch', ''),
+				core_download_url: cfg('core', 'download_url', '')
 			};
 		}
 	},
@@ -1063,6 +1112,20 @@ const methods = {
 	clear_ruleset_log: {
 		call: function() {
 			return clear_ruleset_log();
+		}
+	},
+
+	check_core_update: {
+		args: { include_prerelease: '0' },
+		call: function(request) {
+			return check_core_update(request.args?.include_prerelease);
+		}
+	},
+
+	update_core: {
+		args: { include_prerelease: '0' },
+		call: function(request) {
+			return update_core(request.args?.include_prerelease);
 		}
 	},
 
