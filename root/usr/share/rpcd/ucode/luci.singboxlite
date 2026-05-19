@@ -165,6 +165,34 @@ function singbox_pid() {
 	return res.stdout || '';
 }
 
+function clash_api_info() {
+	let fallback = {
+		external_controller: '',
+		external_ui: '',
+		secret: ''
+	};
+	let content = readfile(config_path());
+	if (!content)
+		return fallback;
+
+	let config = null;
+	try {
+		config = json(content);
+	} catch (e) {
+		return fallback;
+	}
+
+	if (type(config) != 'object' || type(config.experimental) != 'object' || type(config.experimental.clash_api) != 'object')
+		return fallback;
+
+	let api = config.experimental.clash_api;
+	return {
+		external_controller: api.external_controller || '',
+		external_ui: api.external_ui || '',
+		secret: api.secret || ''
+	};
+}
+
 function validate_json_file(path) {
 	if (stat(path)?.type != 'file')
 		return { ok: false, output: '文件不存在：' + path };
@@ -1003,6 +1031,7 @@ const methods = {
 	status: {
 		call: function() {
 			let log = log_path();
+			let clash = clash_api_info();
 			return {
 				singbox_installed: command_exists('/usr/bin/sing-box'),
 				singbox_running: !!service_running('sing-box'),
@@ -1033,7 +1062,10 @@ const methods = {
 				core_last_update_time: cfg('core', 'last_update_time', ''),
 				core_last_update_result: cfg('core', 'last_update_result', ''),
 				core_arch: cfg('core', 'arch', ''),
-				core_download_url: cfg('core', 'download_url', '')
+				core_download_url: cfg('core', 'download_url', ''),
+				clash_api_external_controller: clash.external_controller,
+				clash_api_external_ui: clash.external_ui,
+				clash_api_secret: clash.secret
 			};
 		}
 	},

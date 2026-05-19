@@ -205,10 +205,30 @@ function saveAndApplyAll() {
 	});
 }
 
-function openClashPanel() {
+function clashControllerPort(controller) {
+	var match = String(controller || '').match(/:(\d+)$/);
+	return match ? match[1] : '9090';
+}
+
+function openClashPanel(status) {
+	var controller = status && status.clash_api_external_controller || '';
+	var port = clashControllerPort(controller);
 	var host = window.location.hostname || '10.0.0.1';
-	var protocol = window.location.protocol || 'http:';
-	window.open(protocol + '//' + host + ':9090/ui/', '_blank', 'noopener');
+	var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+	var secret = status && status.clash_api_secret || '';
+	var params = [
+		'hostname=' + encodeURIComponent(host),
+		'port=' + encodeURIComponent(port),
+		'secret=' + encodeURIComponent(secret),
+		'http=1',
+		'label=' + encodeURIComponent('SingBox Lite'),
+		'disableUpgradeCore=1'
+	].join('&');
+
+	if (/^(127\.0\.0\.1|localhost|\[?::1\]?):/.test(controller))
+		ui.addNotification(null, E('p', {}, 'Clash API 当前监听在 ' + controller + '，如果新窗口打不开，需要把 external_controller 改成 0.0.0.0:' + port + ' 或路由器 LAN IP。'), 'info');
+
+	window.open(protocol + '//' + host + ':' + port + '/ui/#/setup?' + params, '_blank', 'noopener');
 }
 
 function logoIcon() {
@@ -710,8 +730,8 @@ function renderOverviewPanel(status) {
 					E('button', { 'class': 'sbl-btn primary', 'click': function() { return callRestartMosdns().then(function(res) { notify('重启 MosDNS', res); }); } }, '重启 MosDNS')
 				]),
 				coreUpdateCard(status),
-				operationCard('Clash API', '打开 sing-box 的 Clash 控制面板，地址使用当前路由器 IP 与 9090 端口。', [
-					E('button', { 'class': 'sbl-btn primary', 'click': openClashPanel }, '打开面板')
+				operationCard('Clash API', '打开 sing-box 的 Clash 控制面板，自动带入控制器地址和 Secret。', [
+					E('button', { 'class': 'sbl-btn primary', 'click': function() { openClashPanel(status); } }, '打开面板')
 				])
 			]),
 			E('div', { 'class': 'sbl-grid' }, [
