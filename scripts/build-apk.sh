@@ -104,7 +104,7 @@ prepare_root() {
 
 build_package() {
 	mkdir -p "$OUT_DIR"
-	rm -f "$OUT_DIR/$PKG_FILE"
+	rm -f "$OUT_DIR"/*.apk
 
 	STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/fakeroot" "$SDK_DIR/staging_dir/host/bin/apk" mkpkg \
 		--info "name:$PKG_NAME" \
