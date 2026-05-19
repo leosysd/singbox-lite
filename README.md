@@ -13,18 +13,18 @@ SingBox Lite 是一个面向 OpenWrt 的轻量 LuCI App，用来安全导入和�
 最新成品包固定下载地址：
 
 ```text
-https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite-0.1.0-r1.apk
+https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite.apk
 ```
 
 路由器上可直接拉取并安装：
 
 ```sh
 cd /tmp
-wget -O luci-app-singbox-lite-0.1.0-r1.apk https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite-0.1.0-r1.apk
-apk add --allow-untrusted --force-overwrite /tmp/luci-app-singbox-lite-0.1.0-r1.apk
-rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null
+wget -O luci-app-singbox-lite.apk https://github.com/leosysd/singbox-lite/releases/latest/download/luci-app-singbox-lite.apk
+apk add --allow-untrusted /tmp/luci-app-singbox-lite.apk
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
 /etc/init.d/rpcd restart
-/etc/init.d/uhttpd reload || /etc/init.d/uhttpd restart
+/etc/init.d/uhttpd restart
 ```
 
 ## 自动发布
