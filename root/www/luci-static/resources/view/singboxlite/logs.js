@@ -39,7 +39,7 @@ function sourcePath(source) {
 		return 'logread';
 	if (source === 'app')
 		return '/tmp/singboxlite-ruleset.log';
-	return lastStatus.log_path || '/etc/sing-box/sing-box.log';
+	return 'logread | grep sing-box';
 }
 
 function formatBytes(size) {
@@ -219,18 +219,18 @@ function setAutoRefresh(enabled) {
 }
 
 function cleanCurrentLog() {
-	if (activeSource === 'system') {
-		ui.addNotification(null, E('p', {}, '系统日志由 OpenWrt 管理，这里不清理。'), 'info');
+	if (activeSource === 'system' || activeSource === 'singbox') {
+		ui.addNotification(null, E('p', {}, activeSource === 'singbox' ? '当前 sing-box 日志来自系统日志 logread，这里不单独清理。' : '系统日志由 OpenWrt 管理，这里不清理。'), 'info');
 		return;
 	}
 
 	return ui.showModal('确认清理日志', [
-		E('p', {}, activeSource === 'app' ? '确定要清理规则集/软件日志吗？' : '确定要清空 sing-box 日志吗？'),
+			E('p', {}, '确定要清理规则集/软件日志吗？'),
 		E('div', { 'class': 'right' }, [
 			E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
 			E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
 				ui.hideModal();
-				return (activeSource === 'app' ? callClearRulesetLog() : callCleanLog()).then(function(res) {
+					return callClearRulesetLog().then(function(res) {
 					ui.addNotification(null, E('p', {}, res.output || '日志已清理'), res.ok ? 'info' : 'error');
 					return refreshLog();
 				});
@@ -350,7 +350,7 @@ return view.extend({
 			]),
 			E('div', { 'class': 'sbll-stats' }, [
 					statCard('当前来源', 'Sing-box 日志', sourcePath('singbox'), '', 'sbll-source-value', 'sbll-source-meta'),
-					statCard('日志大小', formatBytes(initial.size || status.log_size || 0), '建议清理或启用轮转', (initial.size || status.log_size || 0) > 1024 * 1024 ? 'danger' : ''),
+					statCard('日志大小', formatBytes(initial.size || 0), activeSource === 'singbox' ? '来自系统日志 logread' : '建议清理或启用轮转', (initial.size || 0) > 1024 * 1024 ? 'danger' : ''),
 					statCard('匹配结果', '-', '错误 0 · 警告 0 · 信息 0', '', 'sbll-match-value', 'sbll-match-meta'),
 					statCard('自动刷新', autoRefresh ? '开启' : '关闭', autoRefresh ? '每 5 秒刷新一次' : '手动刷新', autoRefresh ? 'ok' : '', 'sbll-auto-value', 'sbll-auto-meta')
 				]),
@@ -398,11 +398,11 @@ return view.extend({
 						E('h3', {}, '维护动作'),
 						E('div', { 'class': 'sbll-maint' }, [
 							E('div', { 'class': 'sbll-maint-row' }, [
-								E('div', {}, [ E('b', {}, 'Sing-box 日志'), E('span', {}, formatBytes(status.log_size || 0) + '，可清理') ]),
+								E('div', {}, [ E('b', {}, 'Sing-box 日志'), E('span', {}, '来自系统日志 logread，显示 sing-box 相关记录') ]),
 								E('button', { 'class': 'sbll-btn', 'click': function() {
 									activeSource = 'singbox';
 									return cleanCurrentLog();
-								} }, '清理')
+								} }, '说明')
 							]),
 							E('div', { 'class': 'sbll-maint-row' }, [
 								E('div', {}, [ E('b', {}, '规则集日志'), E('span', {}, '/tmp/singboxlite-ruleset.log') ]),
