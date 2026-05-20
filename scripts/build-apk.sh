@@ -134,6 +134,7 @@ verify_package() {
 
 	test -x "$extract_dir/usr/share/singboxlite/prepare-mosdns-config.uc"
 	test -x "$extract_dir/usr/share/singboxlite/prepare-singbox-config.uc"
+	test -x "$extract_dir/usr/share/singboxlite/update-singbox-core.sh"
 	test -x "$extract_dir/usr/share/rpcd/ucode/luci.singboxlite"
 	STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/apk" adbdump "$OUT_DIR/$PKG_FILE" | grep -q "post-install"
 }
