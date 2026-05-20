@@ -84,17 +84,17 @@ apk_url_from_meta() {
 	local meta="$1"
 	local arch="$2"
 
-	sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*sing-box_[^"]*_linux_'"$arch"'\.apk\)".*/\1/p' "$meta" | head -n 1
+	sed -n 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*sing-box_[^"]*_openwrt_'"$arch"'\.apk\)".*/\1/p' "$meta" | head -n 1
 }
 
 apk_version_from_url() {
 	local url="$1"
-	basename "$url" | sed -n 's/^sing-box_\([^_]*\)_linux_.*/\1/p'
+	basename "$url" | sed -n 's/^sing-box_\([^_]*\)_openwrt_.*/\1/p'
 }
 
 list_apk_assets() {
 	local meta="$1"
-	sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\(sing-box_[^"]*_linux_[^"]*\.apk\)".*/\1/p' "$meta" | tr '\n' ' '
+	sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\(sing-box_[^"]*_openwrt_[^"]*\.apk\)".*/\1/p' "$meta" | tr '\n' ' '
 }
 
 load_release_meta() {
@@ -121,7 +121,7 @@ resolve_release() {
 
 	if [ -z "$url" ]; then
 		listed="$(list_apk_assets "$meta")"
-		log "未找到匹配 linux-$arch 的 GitHub APK 资源"
+		log "未找到匹配 openwrt-$arch 的 GitHub APK 资源"
 		[ -n "$listed" ] && log "可见 APK 资源：$listed"
 		return 1
 	fi
@@ -155,7 +155,7 @@ check_update() {
 
 	log "当前版本：${current:-未知}"
 	log "目标版本：$latest"
-	log "目标架构：linux-$arch"
+	log "目标架构：openwrt-$arch"
 	log "GitHub APK：$url"
 
 	[ "$current" = "$latest" ] && log "当前已经是目标版本"
@@ -270,6 +270,7 @@ update_core() {
 		start_singbox_after_update >/dev/null 2>&1 || true
 		return 1
 	}
+	rm -f "$apk_file"
 
 	newver="$(current_version)"
 	if [ -z "$newver" ]; then
