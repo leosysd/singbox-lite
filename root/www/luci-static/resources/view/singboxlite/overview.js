@@ -960,11 +960,11 @@ function renderLogsPanel(status, initial) {
 function css() {
 	return E('style', {}, `
 		.cbi-tabmenu,.tabs,#tabmenu,.tabmenu,.cbi-map > .cbi-section:first-child:empty{display:none!important}
-		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:12px 18px 18px;background:#edf4fb;min-height:calc(100vh - 110px)}
+		.sbl-page{color:#14223a;font-size:12px;margin:-12px;padding:12px 18px 18px;background:linear-gradient(180deg,#245b95 0,#245b95 116px,#edf4fb 116px,#edf4fb 100%);min-height:calc(100vh - 110px)}
 		.sbl-page *{box-sizing:border-box}
 		.sbl-shell{max-width:1440px;margin:0 auto}
 		.sbl-panel{background:#fff;border:1px solid #d6e1ef;border-radius:8px;box-shadow:0 8px 22px rgba(41,67,104,.06)}
-		.sbl-hero{position:relative;overflow:hidden;background:#245b95;border-color:#1e5288;padding:13px 16px 12px;margin-bottom:8px;color:#fff;min-height:104px;display:flex;align-items:center}
+		.sbl-hero{position:relative;overflow:hidden;background:#245b95;border-color:#1e5288;padding:13px 16px 12px;margin-bottom:8px;color:#fff;min-height:104px;display:flex;align-items:center;box-shadow:none}
 		.sbl-hero-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%}
 		.sbl-brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 		.sbl-logo{position:relative;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.16);display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
