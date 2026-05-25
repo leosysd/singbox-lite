@@ -72,6 +72,8 @@ uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxli
 uci -q get singboxlite.core >/dev/null || uci -q set singboxlite.core='core'
 uci -q get singboxlite.core.include_prerelease >/dev/null || uci -q set singboxlite.core.include_prerelease='0'
 uci -q get singboxlite.app >/dev/null || uci -q set singboxlite.app='app'
+APP_VERSION="$(cat /usr/share/singboxlite/version 2>/dev/null || true)"
+[ -n "$APP_VERSION" ] && uci -q set singboxlite.app.current_version="$APP_VERSION"
 uci -q get singboxlite.log.auto_refresh >/dev/null || uci -q set singboxlite.log.auto_refresh='0'
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
@@ -101,6 +103,7 @@ prepare_root() {
 	find "$BUILD_ROOT" -type f -exec chmod 0644 {} +
 	find "$BUILD_ROOT" -type f \( -name '*.sh' -o -name '*.uc' -o -path '*/usr/share/rpcd/ucode/*' \) -exec chmod 0755 {} +
 	[ -f "$BUILD_ROOT/etc/config/singboxlite" ] && chmod 0600 "$BUILD_ROOT/etc/config/singboxlite"
+	printf '%s-r%s\n' "$PKG_VERSION" "$PKG_RELEASE" > "$BUILD_ROOT/usr/share/singboxlite/version"
 
 	mkdir -p "$BUILD_ROOT/lib/apk/packages"
 	printf '/etc/config/singboxlite\n' > "$BUILD_ROOT/lib/apk/packages/${PKG_NAME}.conffiles"
@@ -141,6 +144,7 @@ verify_package() {
 	test -x "$extract_dir/usr/share/singboxlite/prepare-singbox-config.uc"
 	test -x "$extract_dir/usr/share/singboxlite/update-app.sh"
 	test -x "$extract_dir/usr/share/singboxlite/update-singbox-core.sh"
+	test "$(cat "$extract_dir/usr/share/singboxlite/version")" = "${PKG_VERSION}-r${PKG_RELEASE}"
 	test -x "$extract_dir/usr/share/rpcd/ucode/luci.singboxlite"
 	STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/apk" adbdump "$OUT_DIR/$PKG_FILE" | grep -q "post-install"
 }

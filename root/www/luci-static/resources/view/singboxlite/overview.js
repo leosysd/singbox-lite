@@ -76,6 +76,10 @@ function isTimeoutError(e) {
 	return e && /timed out/i.test(String(e.message || e));
 }
 
+function isAbortError(e) {
+	return e && /(aborted|abort)/i.test(String(e.message || e));
+}
+
 function reloadAfterPendingApply() {
 	ui.addNotification(null, E('p', {}, '应用过程仍在后台执行，页面将在稍后刷新状态'), 'info');
 	window.setTimeout(function() { location.reload(); }, 15000);
@@ -318,7 +322,7 @@ function updateApp() {
 		window.setTimeout(function() { location.reload(); }, 8000);
 		return res;
 	}).catch(function(e) {
-		if (isTimeoutError(e)) {
+		if (isTimeoutError(e) || isAbortError(e)) {
 			ui.addNotification(null, E('p', {}, '软件更新可能仍在执行，页面将在 20 秒后刷新。'), 'info');
 			window.setTimeout(function() { location.reload(); }, 20000);
 			return;

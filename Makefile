@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-singbox-lite
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=23
+PKG_RELEASE:=25
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Codex
 PKGARCH:=all
@@ -44,6 +44,8 @@ uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxli
 uci -q get singboxlite.core >/dev/null || uci -q set singboxlite.core='core'
 uci -q get singboxlite.core.include_prerelease >/dev/null || uci -q set singboxlite.core.include_prerelease='0'
 uci -q get singboxlite.app >/dev/null || uci -q set singboxlite.app='app'
+APP_VERSION="$$(cat /usr/share/singboxlite/version 2>/dev/null || true)"
+[ -n "$$APP_VERSION" ] && uci -q set singboxlite.app.current_version="$$APP_VERSION"
 uci -q get singboxlite.log.auto_refresh >/dev/null || uci -q set singboxlite.log.auto_refresh='0'
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
@@ -76,6 +78,7 @@ define Package/luci-app-singbox-lite/install
 
 	$(INSTALL_DIR) $(1)/usr/share/singboxlite
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/auto-update.sh $(1)/usr/share/singboxlite/auto-update.sh
+	echo "$(PKG_VERSION)-r$(PKG_RELEASE)" > $(1)/usr/share/singboxlite/version
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/prepare-mosdns-config.uc $(1)/usr/share/singboxlite/prepare-mosdns-config.uc
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/prepare-singbox-config.uc $(1)/usr/share/singboxlite/prepare-singbox-config.uc
 	$(INSTALL_BIN) ./root/usr/share/singboxlite/sing-box-disable-dns-hijack.sh $(1)/usr/share/singboxlite/sing-box-disable-dns-hijack.sh

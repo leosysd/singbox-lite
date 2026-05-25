@@ -1064,10 +1064,13 @@ function update_app() {
 	if (stat(APP_UPDATER)?.type != 'file')
 		return { ok: false, output: '缺少软件更新脚本：' + APP_UPDATER };
 
-	let res = exec_cmd(shellquote(APP_UPDATER) + ' update');
+	set_cfg('app', 'last_update_result', 'running');
+	set_cfg('app', 'last_update_time', now_string());
+	let cmd = shellquote(APP_UPDATER) + ' update >> /tmp/singboxlite-app-update.log 2>&1 &';
+	let res = exec_cmd('/bin/sh -c ' + shellquote(cmd));
 	return {
 		ok: res.code === 0,
-		output: res.stdout || (res.code === 0 ? '软件更新完成' : '软件更新失败'),
+		output: res.stdout || (res.code === 0 ? '已开始后台更新 SingBox Lite。LuCI 服务会在安装完成后自动重启，请稍后刷新页面。' : '软件更新启动失败'),
 		current_version: cfg('app', 'current_version', ''),
 		latest_version: cfg('app', 'latest_version', ''),
 		update_available: cfg('app', 'update_available', ''),

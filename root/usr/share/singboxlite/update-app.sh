@@ -10,6 +10,7 @@ APK_URL="${APP_APK_URL:-https://github.com/$REPO/releases/latest/download/luci-a
 TMP_DIR="${TMP_DIR:-/tmp/singboxlite-app-update}"
 LOG_FILE="${LOG_FILE:-/tmp/singboxlite-app-update.log}"
 APK_FILE="$TMP_DIR/luci-app-singbox-lite.apk"
+VERSION_FILE="/usr/share/singboxlite/version"
 
 log() {
 	local line
@@ -65,8 +66,26 @@ fetch_url() {
 }
 
 current_version() {
+	local ver
+
+	ver="$(cat "$VERSION_FILE" 2>/dev/null || true)"
+	if [ -n "$ver" ]; then
+		printf '%s\n' "$ver"
+		return
+	fi
+
+	ver="$(uci -q get singboxlite.app.current_version 2>/dev/null || true)"
+	if [ -n "$ver" ]; then
+		printf '%s\n' "$ver"
+		return
+	fi
+
 	if command -v apk >/dev/null 2>&1; then
-		apk info -v "$PKG_NAME" 2>/dev/null | sed -n "s/^$PKG_NAME-//p" | head -n 1
+		ver="$(apk info -v "$PKG_NAME" 2>/dev/null | sed -n "s/^$PKG_NAME-//p" | head -n 1)"
+		if [ -z "$ver" ]; then
+			ver="$(apk list --installed "$PKG_NAME" 2>/dev/null | sed -n "s/^$PKG_NAME-\\([^ ]*\\).*/\\1/p" | head -n 1)"
+		fi
+		printf '%s\n' "$ver"
 	fi
 }
 
