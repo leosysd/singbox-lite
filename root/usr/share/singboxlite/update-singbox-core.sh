@@ -198,14 +198,33 @@ install_apk() {
 	apk add --allow-untrusted "$apk_file" >> "$LOG_FILE" 2>&1
 }
 
+procd_service_not_found() {
+	case "$1" in
+		*"ubus call service delete"*"(Not found)"*) return 0 ;;
+	esac
+	return 1
+}
+
 stop_singbox_for_update() {
+	local output rc
+
 	if [ ! -x /etc/init.d/sing-box ]; then
 		log "未找到 /etc/init.d/sing-box，无法停止服务"
 		return 1
 	fi
 
 	log "停止 sing-box 服务"
-	/etc/init.d/sing-box stop >> "$LOG_FILE" 2>&1 || return 1
+	output="$(/etc/init.d/sing-box stop 2>&1)"
+	rc=$?
+	[ -n "$output" ] && printf '%s\n' "$output" >> "$LOG_FILE"
+	if [ "$rc" -ne 0 ]; then
+		if procd_service_not_found "$output"; then
+			log "sing-box 未注册到 procd，继续更新"
+		else
+			return 1
+		fi
+	fi
+
 	sleep 1
 	if /etc/init.d/sing-box status >/dev/null 2>&1; then
 		log "sing-box 停止后仍在运行"

@@ -82,6 +82,28 @@ service_running() {
 	"/etc/init.d/$service" status >/dev/null 2>&1
 }
 
+procd_service_not_found() {
+	case "$1" in
+		*"ubus call service delete"*"(Not found)"*) return 0 ;;
+	esac
+	return 1
+}
+
+restart_singbox() {
+	local output rc
+
+	output="$(/etc/init.d/sing-box stop 2>&1)"
+	rc=$?
+	[ -n "$output" ] && printf '%s\n' "$output" >> "$LOG_FILE"
+
+	if [ "$rc" -ne 0 ] && ! procd_service_not_found "$output"; then
+		return 1
+	fi
+
+	sleep 1
+	/etc/init.d/sing-box start >> "$LOG_FILE" 2>&1
+}
+
 fetch_file() {
 	local name="$1"
 	local tmp="$TMP_DIR/$name.tmp"
@@ -150,7 +172,7 @@ update_rules() {
 
 	if [ "$SINGBOX_RESTART" = "1" ] && service_running sing-box; then
 		log "restart sing-box"
-		/etc/init.d/sing-box restart >> "$LOG_FILE" 2>&1 || die "failed to restart sing-box"
+		restart_singbox || die "failed to restart sing-box"
 	elif [ "$SINGBOX_RESTART" = "1" ]; then
 		log "skip sing-box restart because sing-box is not running"
 	fi

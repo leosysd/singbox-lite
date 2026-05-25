@@ -114,8 +114,45 @@ enable_mosdns() {
 	uci -q commit mosdns
 }
 
+procd_service_not_found() {
+	case "$1" in
+		*"ubus call service delete"*"(Not found)"*) return 0 ;;
+	esac
+	return 1
+}
+
+stop_singbox_service() {
+	local output rc
+
+	[ -x /etc/init.d/sing-box ] || {
+		log_result "sing-box init script not found"
+		exit 1
+	}
+
+	set +e
+	output="$(/etc/init.d/sing-box stop 2>&1)"
+	rc=$?
+	set -e
+
+	if [ "$rc" -ne 0 ] && ! procd_service_not_found "$output"; then
+		return 1
+	fi
+
+	return 0
+}
+
 restart_singbox() {
-	/etc/init.d/sing-box restart
+	stop_singbox_service || {
+		log_result "sing-box stop failed"
+		exit 1
+	}
+
+	sleep 1
+	/etc/init.d/sing-box start || {
+		log_result "sing-box start failed"
+		exit 1
+	}
+
 	sleep 2
 	/etc/init.d/sing-box status >/dev/null 2>&1 || {
 		log_result "sing-box restart failed"
@@ -124,14 +161,11 @@ restart_singbox() {
 }
 
 stop_singbox_for_apply() {
-	[ -x /etc/init.d/sing-box ] || {
-		log_result "sing-box init script not found"
-		exit 1
-	}
-	/etc/init.d/sing-box stop >/dev/null 2>&1 || {
+	stop_singbox_service || {
 		log_result "sing-box stop failed"
 		exit 1
 	}
+
 	sleep 1
 	if /etc/init.d/sing-box status 2>/dev/null | grep -qi running; then
 		log_result "sing-box still running after stop"

@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to create or update
         required: true
-        default: v0.1.0-r20
+        default: v0.1.0-r21
   push:
     tags:
       - 'v*'

@@ -266,21 +266,33 @@ function cleanup_apply_backup() {
 	return { ok: res.code === 0, output: res.stdout || '已清理临时回滚备份' };
 }
 
+function procd_service_not_found(res) {
+	return res && res.code !== 0
+		&& match(res.stdout || '', /ubus call service delete/)
+		&& match(res.stdout || '', /\(Not found\)/);
+}
+
 function restart_singbox_internal() {
 	if (stat('/etc/init.d/sing-box')?.type != 'file')
 		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
 
-	let res = exec_cmd('/etc/init.d/sing-box restart');
-	if (res.code !== 0)
-		return { ok: false, output: res.stdout };
+	let stopped = exec_cmd('/etc/init.d/sing-box stop');
+	if (stopped.code !== 0 && !procd_service_not_found(stopped))
+		return { ok: false, output: stopped.stdout };
+
+	exec_cmd('sleep 1');
+
+	let started = exec_cmd('/etc/init.d/sing-box start');
+	if (started.code !== 0)
+		return { ok: false, output: trim_text((procd_service_not_found(stopped) ? '' : stopped.stdout || '') + '\n' + (started.stdout || '')) };
 
 	exec_cmd('sleep 2');
 
 	let status = exec_cmd('/etc/init.d/sing-box status');
 	if (status.code !== 0 || !match(status.stdout, /running/i))
-		return { ok: false, output: trim_text((res.stdout || '') + '\n' + (status.stdout || 'sing-box 重启后未保持运行')) };
+		return { ok: false, output: trim_text((started.stdout || '') + '\n' + (status.stdout || 'sing-box 重启后未保持运行')) };
 
-	return { ok: true, output: res.stdout || 'sing-box 已重启' };
+	return { ok: true, output: started.stdout || 'sing-box 已重启' };
 }
 
 function wait_seconds(seconds) {
@@ -309,6 +321,9 @@ function stop_singbox_internal() {
 		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
 
 	let res = exec_cmd('/etc/init.d/sing-box stop');
+	if (procd_service_not_found(res))
+		return { ok: true, output: 'sing-box 已停止' };
+
 	return { ok: res.code === 0, output: res.stdout || 'sing-box 已停止' };
 }
 
@@ -317,7 +332,7 @@ function stop_singbox_for_apply() {
 		return { ok: false, output: '未找到 /etc/init.d/sing-box' };
 
 	let res = exec_cmd('/etc/init.d/sing-box stop');
-	if (res.code !== 0)
+	if (res.code !== 0 && !procd_service_not_found(res))
 		return { ok: false, output: res.stdout };
 
 	wait_seconds(1);
