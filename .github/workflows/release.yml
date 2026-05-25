@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to create or update
         required: true
-        default: v0.1.0-r21
+        default: v0.1.0-r22
   push:
     tags:
       - 'v*'
@@ -14,16 +14,13 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-release:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install build dependencies
         run: |
@@ -37,7 +34,7 @@ jobs:
         run: cp dist/luci-app-singbox-lite-*.apk dist/luci-app-singbox-lite.apk
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: luci-app-singbox-lite-apk
           path: dist/*.apk

@@ -52,6 +52,7 @@ rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
 - 支持查看、筛选、清理 sing-box 日志。
 - 支持写入每天清理日志的 cron。
 - 支持保存远程配置自动更新时间。
+- 支持在总览页检查并更新 SingBox Lite 软件包。
 - 内置 `leosysd/ruleset` 路由器侧规则更新能力。
 - 支持自定义 sing-box 规则目录、MosDNS 规则目录和 dist 源地址。
 - 支持每周定时拉取 6 个规则成品文件。

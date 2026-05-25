@@ -26,6 +26,7 @@ const SINGBOX_PREPARE = '/usr/share/singboxlite/prepare-singbox-config.uc';
 const RULESET_UPDATER = '/usr/share/singboxlite/update-geosite-rules.sh';
 const RULESET_LOG = '/tmp/singboxlite-ruleset.log';
 const CORE_UPDATER = '/usr/share/singboxlite/update-singbox-core.sh';
+const APP_UPDATER = '/usr/share/singboxlite/update-app.sh';
 
 function trim_text(value) {
 	return replace(value || '', /^\s+|\s+$/g, '');
@@ -1042,6 +1043,40 @@ function update_core(include_prerelease) {
 	};
 }
 
+function check_app_update() {
+	if (stat(APP_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少软件更新脚本：' + APP_UPDATER };
+
+	let res = exec_cmd(shellquote(APP_UPDATER) + ' check');
+	return {
+		ok: res.code === 0,
+		output: res.stdout || (res.code === 0 ? '软件更新检查完成' : '软件更新检查失败'),
+		current_version: cfg('app', 'current_version', ''),
+		latest_version: cfg('app', 'latest_version', ''),
+		update_available: cfg('app', 'update_available', ''),
+		last_check_time: cfg('app', 'last_check_time', ''),
+		last_check_result: cfg('app', 'last_check_result', ''),
+		download_url: cfg('app', 'download_url', '')
+	};
+}
+
+function update_app() {
+	if (stat(APP_UPDATER)?.type != 'file')
+		return { ok: false, output: '缺少软件更新脚本：' + APP_UPDATER };
+
+	let res = exec_cmd(shellquote(APP_UPDATER) + ' update');
+	return {
+		ok: res.code === 0,
+		output: res.stdout || (res.code === 0 ? '软件更新完成' : '软件更新失败'),
+		current_version: cfg('app', 'current_version', ''),
+		latest_version: cfg('app', 'latest_version', ''),
+		update_available: cfg('app', 'update_available', ''),
+		last_update_time: cfg('app', 'last_update_time', ''),
+		last_update_result: cfg('app', 'last_update_result', ''),
+		download_url: cfg('app', 'download_url', '')
+	};
+}
+
 const methods = {
 	status: {
 		call: function() {
@@ -1078,6 +1113,14 @@ const methods = {
 				core_last_update_result: cfg('core', 'last_update_result', ''),
 				core_arch: cfg('core', 'arch', ''),
 				core_download_url: cfg('core', 'download_url', ''),
+				app_current_version: cfg('app', 'current_version', ''),
+				app_latest_version: cfg('app', 'latest_version', ''),
+				app_update_available: cfg('app', 'update_available', ''),
+				app_last_check_time: cfg('app', 'last_check_time', ''),
+				app_last_check_result: cfg('app', 'last_check_result', ''),
+				app_last_update_time: cfg('app', 'last_update_time', ''),
+				app_last_update_result: cfg('app', 'last_update_result', ''),
+				app_download_url: cfg('app', 'download_url', ''),
 				clash_api_external_controller: clash.external_controller,
 				clash_api_external_ui: clash.external_ui,
 				clash_api_secret: clash.secret
@@ -1173,6 +1216,18 @@ const methods = {
 		args: { include_prerelease: '0' },
 		call: function(request) {
 			return update_core(request.args?.include_prerelease);
+		}
+	},
+
+	check_app_update: {
+		call: function() {
+			return check_app_update();
+		}
+	},
+
+	update_app: {
+		call: function() {
+			return update_app();
 		}
 	},
 

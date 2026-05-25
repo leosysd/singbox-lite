@@ -69,6 +69,9 @@ uci -q get singboxlite.ruleset.update_time >/dev/null || uci -q set singboxlite.
 uci -q get singboxlite.ruleset.update_weekday >/dev/null || uci -q set singboxlite.ruleset.update_weekday='2'
 uci -q get singboxlite.ruleset.restart_singbox >/dev/null || uci -q set singboxlite.ruleset.restart_singbox='0'
 uci -q get singboxlite.ruleset.restart_mosdns >/dev/null || uci -q set singboxlite.ruleset.restart_mosdns='1'
+uci -q get singboxlite.core >/dev/null || uci -q set singboxlite.core='core'
+uci -q get singboxlite.core.include_prerelease >/dev/null || uci -q set singboxlite.core.include_prerelease='0'
+uci -q get singboxlite.app >/dev/null || uci -q set singboxlite.app='app'
 uci -q get singboxlite.log.auto_refresh >/dev/null || uci -q set singboxlite.log.auto_refresh='0'
 mkdir -p /etc/sing-box/singboxlite
 uci -q set singboxlite.main.temp_dir='/etc/sing-box/singboxlite'
@@ -79,8 +82,10 @@ rm -rf /tmp/singboxlite
 rm -f /etc/sing-box/config.json.bak-singboxlite-*
 uci -q commit singboxlite
 rm -f /www/luci-static/resources/view/singboxlite/import.js /www/luci-static/resources/view/singboxlite/mode.js
-/etc/init.d/rpcd restart >/dev/null 2>&1 || true
-/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+if [ "${SINGBOXLITE_SKIP_RESTART:-0}" != "1" ]; then
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+	/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+fi
 exit 0
 POSTINSTALL
 
@@ -134,6 +139,7 @@ verify_package() {
 
 	test -x "$extract_dir/usr/share/singboxlite/prepare-mosdns-config.uc"
 	test -x "$extract_dir/usr/share/singboxlite/prepare-singbox-config.uc"
+	test -x "$extract_dir/usr/share/singboxlite/update-app.sh"
 	test -x "$extract_dir/usr/share/singboxlite/update-singbox-core.sh"
 	test -x "$extract_dir/usr/share/rpcd/ucode/luci.singboxlite"
 	STAGING_DIR_HOST="$SDK_DIR/staging_dir/host" "$SDK_DIR/staging_dir/host/bin/apk" adbdump "$OUT_DIR/$PKG_FILE" | grep -q "post-install"

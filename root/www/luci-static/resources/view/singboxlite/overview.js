@@ -26,6 +26,8 @@ var callTailSourceLog = rpc.declare({ object: 'luci.singboxlite', method: 'tail_
 var callClearRulesetLog = rpc.declare({ object: 'luci.singboxlite', method: 'clear_ruleset_log', expect: { '': {} } });
 var callCheckCoreUpdate = rpc.declare({ object: 'luci.singboxlite', method: 'check_core_update', params: [ 'include_prerelease' ], expect: { '': {} } });
 var callUpdateCore = rpc.declare({ object: 'luci.singboxlite', method: 'update_core', params: [ 'include_prerelease' ], expect: { '': {} } });
+var callCheckAppUpdate = rpc.declare({ object: 'luci.singboxlite', method: 'check_app_update', expect: { '': {} } });
+var callUpdateApp = rpc.declare({ object: 'luci.singboxlite', method: 'update_app', expect: { '': {} } });
 var callSetCron = rpc.declare({ object: 'luci.singboxlite', method: 'set_cron', expect: { '': {} } });
 
 var WEEKDAYS = [
@@ -293,6 +295,31 @@ function updateCore() {
 	}).catch(function(e) {
 		if (isTimeoutError(e)) {
 			ui.addNotification(null, E('p', {}, '核心更新可能仍在执行，页面将在 20 秒后刷新状态。'), 'info');
+			window.setTimeout(function() { location.reload(); }, 20000);
+			return;
+		}
+		if (e)
+			L.error(e);
+	});
+}
+
+function checkAppUpdate() {
+	return callCheckAppUpdate().then(function(res) {
+		notify('检查软件更新', res);
+		return res;
+	});
+}
+
+function updateApp() {
+	ui.addNotification(null, E('p', {}, '开始更新 SingBox Lite。安装完成后 LuCI 会自动重启，页面稍后刷新。'), 'info');
+
+	return callUpdateApp().then(function(res) {
+		notify('更新 SingBox Lite', res);
+		window.setTimeout(function() { location.reload(); }, 8000);
+		return res;
+	}).catch(function(e) {
+		if (isTimeoutError(e)) {
+			ui.addNotification(null, E('p', {}, '软件更新可能仍在执行，页面将在 20 秒后刷新。'), 'info');
 			window.setTimeout(function() { location.reload(); }, 20000);
 			return;
 		}
@@ -691,6 +718,8 @@ function renderHero() {
 				E('p', {}, '保存并应用会自动拉取远程 JSON，完成配置预检、临时回滚备份、MosDNS 联动和 DNS 探测。')
 			]),
 			E('div', { 'class': 'sbl-actions' }, [
+				E('button', { 'class': 'sbl-btn soft', 'click': checkAppUpdate }, '检查软件'),
+				E('button', { 'class': 'sbl-btn soft', 'click': updateApp }, '更新软件'),
 				E('button', { 'class': 'sbl-btn soft', 'click': function() { return callCheckCurrent().then(function(res) { notify('检查配置', res); }); } }, '检查配置'),
 				E('button', { 'class': 'sbl-btn soft', 'click': function() { switchTab('logs'); } }, '查看日志'),
 				E('button', { 'class': 'sbl-btn primary', 'click': function() { return saveAndApplyAll(); } }, '保存并应用')
