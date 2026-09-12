@@ -54,8 +54,46 @@ function yes(id) {
 	return el && el.checked ? '1' : '0';
 }
 
+// Keep SingBox Lite notices in one fixed stack without changing other LuCI pages.
+function sblAddNotification(title, content, kind) {
+	var box = document.getElementById('sbl-top-notices');
+
+	if (!box) {
+		box = E('div', {
+			id: 'sbl-top-notices',
+			style:
+				'position:fixed;top:64px;right:12px;' +
+				'width:min(640px,calc(100vw - 24px));' +
+				'max-height:calc(100vh - 80px);overflow:auto;' +
+				'display:flex;flex-direction:column;gap:8px;' +
+				'z-index:10000;'
+		});
+		document.body.appendChild(box);
+	}
+
+	// Call LuCI's original function so notification content and dismissal still work.
+	var msg = ui.addNotification(title, content, kind || 'info');
+	msg.style.cssText =
+		'position:static!important;inset:auto!important;' +
+		'transform:none!important;width:100%!important;' +
+		'max-width:none!important;margin:0!important;' +
+		'display:flex;flex:0 0 auto;box-sizing:border-box;';
+
+	if (msg.firstElementChild)
+		msg.firstElementChild.style.minWidth = '0';
+
+	msg.querySelectorAll('pre').forEach(function(pre) {
+		pre.style.whiteSpace = 'pre-wrap';
+		pre.style.overflowWrap = 'anywhere';
+	});
+
+	box.insertBefore(msg, box.firstChild);
+	box.scrollTop = 0;
+	return msg;
+}
+
 function notify(title, res) {
-	ui.addNotification(null, E('pre', { 'class': res && res.ok ? '' : 'errors' }, [
+	sblAddNotification(null, E('pre', { 'class': res && res.ok ? '' : 'errors' }, [
 		title + '\n' + ((res && (res.output || res.backup)) || (res && res.ok ? '操作成功' : '操作失败'))
 	]), res && res.ok ? 'info' : 'error');
 }
@@ -81,7 +119,7 @@ function isAbortError(e) {
 }
 
 function reloadAfterPendingApply() {
-	ui.addNotification(null, E('p', {}, '应用过程仍在后台执行，页面将在稍后刷新状态'), 'info');
+	sblAddNotification(null, E('p', {}, '应用过程仍在后台执行，页面将在稍后刷新状态'), 'info');
 	window.setTimeout(function() { location.reload(); }, 15000);
 }
 
@@ -186,7 +224,7 @@ function saveSettings(message, applyCron) {
 			notify('写入定时任务', res);
 		return refreshChanges();
 	}).then(function() {
-		ui.addNotification(null, E('p', {}, message || '已保存设置'), 'info');
+		sblAddNotification(null, E('p', {}, message || '已保存设置'), 'info');
 	});
 }
 
@@ -232,7 +270,7 @@ function openClashPanel(status) {
 	].join('&');
 
 	if (/^(127\.0\.0\.1|localhost|\[?::1\]?):/.test(controller))
-		ui.addNotification(null, E('p', {}, 'Clash API 当前监听在 ' + controller + '，如果新窗口打不开，需要把 external_controller 改成 0.0.0.0:' + port + ' 或路由器 LAN IP。'), 'info');
+		sblAddNotification(null, E('p', {}, 'Clash API 当前监听在 ' + controller + '，如果新窗口打不开，需要把 external_controller 改成 0.0.0.0:' + port + ' 或路由器 LAN IP。'), 'info');
 
 	window.open(protocol + '//' + host + ':' + port + '/ui/#/setup?' + params, '_blank', 'noopener');
 }
@@ -289,7 +327,7 @@ function checkCoreUpdate() {
 function updateCore() {
 	var include = yes('sbl-core-pre');
 
-	ui.addNotification(null, E('p', {}, '开始更新 sing-box 核心。完成替换后会等待 10 秒并自动重启 sing-box。'), 'info');
+	sblAddNotification(null, E('p', {}, '开始更新 sing-box 核心。完成替换后会等待 10 秒并自动重启 sing-box。'), 'info');
 
 	return callUpdateCore(include).then(function(res) {
 		notify('更新 sing-box 核心', res);
@@ -298,7 +336,7 @@ function updateCore() {
 		return res;
 	}).catch(function(e) {
 		if (isTimeoutError(e)) {
-			ui.addNotification(null, E('p', {}, '核心更新可能仍在执行，页面将在 20 秒后刷新状态。'), 'info');
+			sblAddNotification(null, E('p', {}, '核心更新可能仍在执行，页面将在 20 秒后刷新状态。'), 'info');
 			window.setTimeout(function() { location.reload(); }, 20000);
 			return;
 		}
@@ -315,7 +353,7 @@ function checkAppUpdate() {
 }
 
 function updateApp() {
-	ui.addNotification(null, E('p', {}, '开始更新 SingBox Lite。安装完成后 LuCI 会自动重启，页面稍后刷新。'), 'info');
+	sblAddNotification(null, E('p', {}, '开始更新 SingBox Lite。安装完成后 LuCI 会自动重启，页面稍后刷新。'), 'info');
 
 	return callUpdateApp().then(function(res) {
 		notify('更新 SingBox Lite', res);
@@ -323,7 +361,7 @@ function updateApp() {
 		return res;
 	}).catch(function(e) {
 		if (isTimeoutError(e) || isAbortError(e)) {
-			ui.addNotification(null, E('p', {}, '软件更新可能仍在执行，页面将在 20 秒后刷新。'), 'info');
+			sblAddNotification(null, E('p', {}, '软件更新可能仍在执行，页面将在 20 秒后刷新。'), 'info');
 			window.setTimeout(function() { location.reload(); }, 20000);
 			return;
 		}
@@ -466,7 +504,7 @@ function saveRuleset(message, writeCron, applyNow) {
 			notify('写入定时任务', res);
 		return refreshChanges();
 	}).then(function() {
-		ui.addNotification(null, E('p', {}, message || '已保存规则集设置'), 'info');
+		sblAddNotification(null, E('p', {}, message || '已保存规则集设置'), 'info');
 	});
 }
 
@@ -670,7 +708,7 @@ function setAutoRefresh(enabled) {
 
 function cleanCurrentLog() {
 	if (activeSource === 'system' || activeSource === 'singbox') {
-		ui.addNotification(null, E('p', {}, activeSource === 'singbox' ? '当前 sing-box 日志来自系统日志 logread，这里不单独清理。' : '系统日志由 OpenWrt 管理，这里不清理。'), 'info');
+		sblAddNotification(null, E('p', {}, activeSource === 'singbox' ? '当前 sing-box 日志来自系统日志 logread，这里不单独清理。' : '系统日志由 OpenWrt 管理，这里不清理。'), 'info');
 		return;
 	}
 
@@ -681,7 +719,7 @@ function cleanCurrentLog() {
 			E('button', { 'class': 'btn cbi-button-negative', 'click': function() {
 				ui.hideModal();
 				return callClearRulesetLog().then(function(res) {
-					ui.addNotification(null, E('p', {}, res.output || '日志已清理'), res.ok ? 'info' : 'error');
+					sblAddNotification(null, E('p', {}, res.output || '日志已清理'), res.ok ? 'info' : 'error');
 					return refreshLog();
 				});
 			} }, '清理')
@@ -702,11 +740,11 @@ function saveLogSettings(message, writeCron) {
 			return callSetCron();
 	}).then(function(res) {
 		if (res && res.ok === false)
-			ui.addNotification(null, E('p', {}, res.output || '写入定时任务失败'), 'error');
+			sblAddNotification(null, E('p', {}, res.output || '写入定时任务失败'), 'error');
 		return refreshChanges();
 	}).then(function() {
 		if (message)
-			ui.addNotification(null, E('p', {}, message), 'info');
+			sblAddNotification(null, E('p', {}, message), 'info');
 	});
 }
 
